@@ -41,6 +41,7 @@ const schema = z.object({
   PLAYER_LINK_TABLE: z.string().default(""),
   PLAYER_LINK_DISCORD_ID_COLUMN: z.string().default("discord_id"),
   PLAYER_LINK_EOS_ID_COLUMN: z.string().default("eos_id"),
+  PLAYTIME_DATABASE: z.string().default(""),
   PLAYTIME_TABLE: z.string().default("lethalquestsascended_stats"),
   PLAYTIME_EOS_ID_COLUMN: z.string().default("EOSID"),
   PLAYTIME_MINUTES_COLUMN: z.string().default("MinutesPlayed")

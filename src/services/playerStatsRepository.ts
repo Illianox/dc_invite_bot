@@ -10,7 +10,7 @@ export class MySqlPlayerStatsRepository implements PlayerStatsReader {
   private readonly linkTable = sqlTableIdentifier(env.CROSSCHAT_DATABASE, env.CROSSCHAT_TABLE || env.PLAYER_LINK_TABLE);
   private readonly linkDiscordColumn = sqlIdentifier(env.PLAYER_LINK_DISCORD_ID_COLUMN);
   private readonly linkEosColumn = sqlIdentifier(env.PLAYER_LINK_EOS_ID_COLUMN);
-  private readonly playtimeTable = sqlIdentifier(env.PLAYTIME_TABLE);
+  private readonly playtimeTable = sqlTableIdentifier(env.PLAYTIME_DATABASE, env.PLAYTIME_TABLE);
   private readonly playtimeEosColumn = sqlIdentifier(env.PLAYTIME_EOS_ID_COLUMN);
   private readonly playtimeMinutesColumn = sqlIdentifier(env.PLAYTIME_MINUTES_COLUMN);
 

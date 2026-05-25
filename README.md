@@ -74,6 +74,8 @@ Falls CrossChat-Spielerverknuepfungen in einer separaten Datenbank liegen,
 setze z. B. `CROSSCHAT_DATABASE=blacklist` und
 `CROSSCHAT_TABLE=crosschat_players`. Der Bot fragt dann
 `blacklist.crosschat_players` ab.
+Falls die Spielzeit-Tabelle ebenfalls dort liegt, setze
+`PLAYTIME_DATABASE=blacklist` und `PLAYTIME_TABLE=lethalquestsascended_stats`.
 Der Produktionsbuild startet aus `dist/src/index.js`, da die Testquellen im
 gleichen TypeScript-Projekt mitgeprueft werden.
 
