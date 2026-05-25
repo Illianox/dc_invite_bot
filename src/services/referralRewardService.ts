@@ -145,7 +145,18 @@ export class ReferralRewardService {
     const startMinutes = await this.stats.getMinutesPlayed(invitedEosId);
     if (startMinutes === null) return;
     await this.repository.activateRewardReferral(referral.id, inviterEosId, invitedEosId, startMinutes);
-    await this.repository.logInfo("referral_reward_start_minutes_saved", referral.inviteeDiscordId, referral.id, `Start-Spielzeit fuer Spielerwerbung #${referral.id} gespeichert: ${startMinutes} Minuten.`);
+    await this.repository.logInfo("referral_reward_start_minutes_saved", referral.inviteeDiscordId, referral.id, [
+      `Start-Spielzeit fuer Spielerwerbung #${referral.id} gespeichert.`,
+      "",
+      "Eingeladener Spieler:",
+      displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
+      "",
+      "Eingeladen von:",
+      referral.inviterDiscordId ? displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
+      "",
+      "Start-Spielzeit:",
+      formatOptionalMinutes(startMinutes)
+    ].join("\n"));
   }
 
   private async findAndRememberEosId(guildId: string, discordId: string, discordName: string | null): Promise<string | null> {
@@ -260,4 +271,8 @@ function formatOptionalMinutes(minutes: number | null): string {
   const hours = Math.floor(minutes / 60);
   const remaining = minutes % 60;
   return `${hours} Stunden ${remaining} Minuten`;
+}
+
+function displayUser(userId: string, userName: string | null): string {
+  return userName ? `${userName} (<@${userId}>)` : `<@${userId}>`;
 }
