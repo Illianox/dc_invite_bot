@@ -10,6 +10,17 @@ import type { RankingScope } from "../services/referralService.js";
 import type { Referral } from "../utils/domain.js";
 
 export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
+  if (env.PANEL_IMAGE_URL) {
+    return {
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x8f0d18)
+          .setImage(env.PANEL_IMAGE_URL)
+      ],
+      components: mainPanelButtons()
+    };
+  }
+
   const embed = new EmbedBuilder()
     .setColor(0x8f0d18)
     .setTitle("Blacklist Spieler werben Spieler")
@@ -34,13 +45,17 @@ export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuil
 
   return {
     embeds: [embed],
-    components: [
-      new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine geworbenen Spieler").setStyle(ButtonStyle.Primary)
-      )
-    ]
+    components: mainPanelButtons()
   };
+}
+
+function mainPanelButtons(): ActionRowBuilder<ButtonBuilder>[] {
+  return [
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine geworbenen Spieler").setStyle(ButtonStyle.Primary)
+    )
+  ];
 }
 
 export function referralsPage(

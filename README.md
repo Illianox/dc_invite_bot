@@ -102,12 +102,16 @@ nicht gegenseitig.
 Mit `RANKING_DISPLAY_LIMIT` in `.env` stellst du ein, wie viele Plaetze
 angezeigt werden, zum Beispiel `3`, `10` oder `25`.
 
-## Panel-Banner
+## Panel-Grafik
 
-Mit `PANEL_BANNER_URL` in `.env` kannst du ein grosses Header-Bild ueber dem
-Discord-Panel anzeigen. Der Wert sollte eine direkt erreichbare `https://`-URL
-zu einem Bild sein. Wenn der Wert leer bleibt, wird das Panel ohne Banner
-veroeffentlicht.
+Mit `PANEL_IMAGE_URL` in `.env` kannst du das gesamte Panel als eine grosse
+Grafik anzeigen. Banner, Text und Footer sind dann Teil dieses Bildes; die
+Buttons bleiben echte Discord-Buttons. Der Wert sollte eine direkt erreichbare
+`https://`-URL zu einem Bild sein.
+
+Wenn `PANEL_IMAGE_URL` leer bleibt, nutzt der Bot das normale Text-Panel.
+`PANEL_BANNER_URL` kann in diesem Fallback weiter ein Bild unter dem Text
+anzeigen.
 
 ## Willkommensnachrichten
 
