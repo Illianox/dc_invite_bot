@@ -11,15 +11,18 @@ import { BOT_VERSION, env } from "../config/env.js";
 import type { PanelMessageType, Repository } from "../database/repositories/repository.js";
 import { CooldownService } from "../services/cooldownService.js";
 import { InviteService } from "../services/inviteService.js";
+import type { PlayerStatsReader } from "../services/playerStatsRepository.js";
 import { ReferralRewardService } from "../services/referralRewardService.js";
 import { ReferralService, type RankingScope } from "../services/referralService.js";
 import { mainPanel, rankingEmbed, referralsPage } from "../ui/embeds.js";
+import type { Referral } from "../utils/domain.js";
 
 export interface CommandDependencies {
   client: Client;
   repository: Repository;
   invites: InviteService;
   referrals: ReferralService;
+  playerStats: PlayerStatsReader;
   rewards: ReferralRewardService;
   cooldowns: CooldownService;
   startedAt: number;
@@ -264,15 +267,29 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
     }
     const data = await deps.referrals.listForInviter(interaction.guildId, member.id);
     const names = new Map<string, string>();
+    const playtimes = new Map<string, number | null>();
     for (const referral of data) {
-      const referredMember = await interaction.guild!.members.fetch(referral.inviteeDiscordId).catch(() => null);
+      const [referredMember, minutesPlayed] = await Promise.all([
+        interaction.guild!.members.fetch(referral.inviteeDiscordId).catch(() => null),
+        currentPlaytimeMinutes(referral, deps.playerStats)
+      ]);
       names.set(referral.inviteeDiscordId, referredMember?.displayName ?? `<@${referral.inviteeDiscordId}>`);
+      playtimes.set(referral.inviteeDiscordId, minutesPlayed);
     }
-    const payload = referralsPage(interaction.user.id, data, names, requestedPage, expiresAt);
+    const payload = referralsPage(interaction.user.id, data, names, playtimes, requestedPage, expiresAt);
     if (interaction.customId.startsWith("referrals:page:")) {
       await interaction.update(payload);
     } else {
       await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
     }
+  }
+}
+
+async function currentPlaytimeMinutes(referral: Referral, stats: PlayerStatsReader): Promise<number | null> {
+  try {
+    const eosId = referral.invitedEosId ?? await stats.findEosId(referral.inviteeDiscordId);
+    return eosId ? await stats.getMinutesPlayed(eosId) : null;
+  } catch {
+    return null;
   }
 }

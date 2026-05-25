@@ -30,7 +30,7 @@ const checkStorage = env.DATA_MODE === "memory"
   ? async (): Promise<number> => 0
   : checkDatabase;
 
-registerEvents(client, { client, repository, invites, referrals, rewards, cooldowns, startedAt, storageMode: env.DATA_MODE, checkStorage });
+registerEvents(client, { client, repository, invites, referrals, playerStats, rewards, cooldowns, startedAt, storageMode: env.DATA_MODE, checkStorage });
 
 client.once("ready", async () => {
   try {

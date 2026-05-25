@@ -62,6 +62,7 @@ export function referralsPage(
   requesterId: string,
   referrals: Referral[],
   names: Map<string, string>,
+  playtimes: Map<string, number | null>,
   page: number,
   expiresAt: number
 ): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
@@ -74,7 +75,8 @@ export function referralsPage(
         .map((referral, index) => {
           const position = safePage * pageSize + index + 1;
           const name = names.get(referral.inviteeDiscordId) ?? `<@${referral.inviteeDiscordId}>`;
-          return `**${position}.** ${name} - <t:${Math.floor(referral.joinedAt.getTime() / 1000)}:d>`;
+          const playtime = formatPlaytime(playtimes.get(referral.inviteeDiscordId) ?? null);
+          return `**${position}.** ${name} - <t:${Math.floor(referral.joinedAt.getTime() / 1000)}:d> - Spielzeit: **${playtime}**`;
         })
         .join("\n")
     : "Du hast aktuell keine erfolgreichen Spielerwerbungen.";
@@ -93,6 +95,14 @@ export function referralsPage(
       ]
     : [];
   return { embeds: [embed], components };
+}
+
+function formatPlaytime(minutes: number | null): string {
+  if (minutes === null) return "unbekannt";
+  const safeMinutes = Math.max(0, Math.floor(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remaining = safeMinutes % 60;
+  return remaining > 0 ? `${hours} Std. ${remaining} Min.` : `${hours} Std.`;
 }
 
 export function rankingEmbed(rows: Array<{ member: GuildMember; total: number }>, scope: RankingScope): EmbedBuilder {
