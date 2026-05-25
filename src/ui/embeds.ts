@@ -10,11 +10,6 @@ import type { RankingScope } from "../services/referralService.js";
 import type { Referral } from "../utils/domain.js";
 
 export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
-  const bannerEmbed = env.PANEL_BANNER_URL
-    ? new EmbedBuilder()
-        .setColor(0x8f0d18)
-        .setImage(env.PANEL_BANNER_URL)
-    : null;
   const embed = new EmbedBuilder()
     .setColor(0x8f0d18)
     .setTitle("Blacklist Spieler werben Spieler")
@@ -34,10 +29,11 @@ export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuil
       ].join("\n")
     )
     .setFooter({ text: "Spieler werben Spieler | Blacklist" });
+  if (env.PANEL_BANNER_URL) embed.setImage(env.PANEL_BANNER_URL);
   if (env.PANEL_THUMBNAIL_URL) embed.setThumbnail(env.PANEL_THUMBNAIL_URL);
 
   return {
-    embeds: bannerEmbed ? [bannerEmbed, embed] : [embed],
+    embeds: [embed],
     components: [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),
