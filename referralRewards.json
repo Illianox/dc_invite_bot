@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "dryRun": true,
+  "checkIntervalSeconds": 300,
+  "maxRetryAttempts": 5,
+  "retryDelaySeconds": 300,
+  "multiServerRewards": false,
+  "rewardServer": {
+    "name": "reward",
+    "host": "127.0.0.1",
+    "port": 27020,
+    "password": ""
+  },
+  "clusterServers": []
+}
