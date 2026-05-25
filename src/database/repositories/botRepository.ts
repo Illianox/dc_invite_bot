@@ -1,6 +1,6 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { InviteStatus, Referral, ReferralRewardLog, ReferralRewardStep, ReferralStatus, ReferralStepProgress, ReferralStepStatus, RewardReferralStatus, UserInvite } from "../../utils/domain.js";
-import type { PanelMessageType, Repository } from "./repository.js";
+import type { PanelMessageType, PendingLog, Repository } from "./repository.js";
 
 interface UserInviteRow extends RowDataPacket {
   id: number;
@@ -51,12 +51,11 @@ interface RewardStepRow extends RowDataPacket {
   enabled: 0 | 1 | boolean;
 }
 
-interface LogRow extends RowDataPacket {
-  id: number;
-  severity: "info" | "warn" | "error";
-  event_type: string;
-  details: string;
-  discord_attempt_count: number;
+interface RuntimeLog extends PendingLog {
+  discordDeliveryStatus: "pending" | "sent" | "failed";
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  createdAt: Date;
 }
 
 function mapInvite(row: UserInviteRow): UserInvite {
@@ -107,6 +106,10 @@ function mapStepProgress(row: ReferralStepProgressRow): ReferralStepProgress {
 }
 
 export class BotRepository implements Repository {
+  private logId = 1;
+  private latestErrorSummary: string | null = null;
+  private readonly logs: RuntimeLog[] = [];
+
   public constructor(private readonly pool: Pool) {}
 
   public async findActiveInvite(guildId: string, inviterId: string): Promise<UserInvite | null> {
@@ -564,10 +567,7 @@ export class BotRepository implements Repository {
   }
 
   public async logInfo(eventType: string, discordUserId: string | null, referralId: number | null, details: string): Promise<void> {
-    await this.pool.query(
-      "INSERT INTO bot_logs (severity, event_type, discord_user_id, referral_id, details) VALUES ('info', ?, ?, ?, ?)",
-      [eventType, discordUserId, referralId, details.slice(0, 4000)]
-    );
+    this.addLog("info", eventType, details.slice(0, 4000));
   }
 
   public async deleteExpiredHistory(retentionDays: number): Promise<void> {
@@ -590,19 +590,10 @@ export class BotRepository implements Repository {
        AND updated_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? DAY)`,
       [retentionDays]
     );
-    await this.pool.query(
-      `DELETE FROM bot_logs
-       WHERE created_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL ? DAY)
-       AND discord_delivery_status = 'sent'`,
-      [retentionDays]
-    );
   }
 
   public async logError(eventType: string, details: string): Promise<void> {
-    await this.pool.query(
-      "INSERT INTO bot_logs (severity, event_type, details) VALUES ('error', ?, ?)",
-      [eventType, details.slice(0, 4000)]
-    );
+    this.addLog("error", eventType, details.slice(0, 4000));
   }
 
   public async savePanelMessage(panelType: PanelMessageType, guildId: string, channelId: string, messageId: string): Promise<void> {
@@ -622,30 +613,27 @@ export class BotRepository implements Repository {
     return rows[0] ? { channelId: rows[0].channel_id, messageId: rows[0].message_id } : null;
   }
 
-  public async pendingLogs(limit = 25): Promise<LogRow[]> {
-    const [rows] = await this.pool.query<LogRow[]>(
-      `SELECT id, severity, event_type, details, discord_attempt_count FROM bot_logs
-       WHERE discord_delivery_status IN ('pending', 'failed')
-         AND (discord_next_attempt_at IS NULL OR discord_next_attempt_at <= CURRENT_TIMESTAMP)
-       ORDER BY id ASC LIMIT ?`,
-      [limit]
-    );
-    return rows;
+  public async pendingLogs(limit = 25): Promise<PendingLog[]> {
+    const now = Date.now();
+    return this.logs.filter((log) =>
+      log.discordDeliveryStatus !== "sent" &&
+      (!log.nextAttemptAt || log.nextAttemptAt.getTime() <= now)
+    ).slice(0, limit);
   }
 
   public async markLogSent(id: number): Promise<void> {
-    await this.pool.query(
-      "UPDATE bot_logs SET discord_delivery_status = 'sent', discord_sent_at = CURRENT_TIMESTAMP WHERE id = ?",
-      [id]
-    );
+    const index = this.logs.findIndex((entry) => entry.id === id);
+    if (index >= 0) this.logs.splice(index, 1);
   }
 
   public async markLogFailed(id: number, attempt: number, retryAt: Date, error: string): Promise<void> {
-    await this.pool.query(
-      `UPDATE bot_logs SET discord_delivery_status = 'failed', discord_attempt_count = ?,
-       discord_next_attempt_at = ?, discord_last_error = ? WHERE id = ?`,
-      [attempt, retryAt, error.slice(0, 1000), id]
-    );
+    const log = this.logs.find((entry) => entry.id === id);
+    if (log) {
+      log.discordDeliveryStatus = "failed";
+      log.discord_attempt_count = attempt;
+      log.nextAttemptAt = retryAt;
+      log.lastError = error.slice(0, 1000);
+    }
   }
 
   public async latestMigration(): Promise<string | null> {
@@ -670,10 +658,7 @@ export class BotRepository implements Repository {
   }
 
   public async latestError(): Promise<string | null> {
-    const [rows] = await this.pool.query<Array<RowDataPacket & { event_type: string; created_at: Date }>>(
-      "SELECT event_type, created_at FROM bot_logs WHERE severity = 'error' ORDER BY created_at DESC LIMIT 1"
-    );
-    return rows[0] ? `${rows[0].event_type} (${rows[0].created_at.toISOString()})` : null;
+    return this.latestErrorSummary;
   }
 
   private async inTransaction<T>(callback: (connection: PoolConnection) => Promise<T>): Promise<T> {
@@ -706,17 +691,30 @@ export class BotRepository implements Repository {
   }
 
   private async insertLog(
-    connection: PoolConnection,
+    _connection: PoolConnection,
     severity: "info" | "warn" | "error",
     eventType: string,
-    userId: string | null,
-    referralId: number | null,
+    _userId: string | null,
+    _referralId: number | null,
     details: string
   ): Promise<void> {
-    await connection.query(
-      "INSERT INTO bot_logs (severity, event_type, discord_user_id, referral_id, details) VALUES (?, ?, ?, ?, ?)",
-      [severity, eventType, userId, referralId, details]
-    );
+    this.addLog(severity, eventType, details.slice(0, 4000));
+  }
+
+  private addLog(severity: "info" | "warn" | "error", eventType: string, details: string): void {
+    const createdAt = new Date();
+    if (severity === "error") this.latestErrorSummary = `${eventType} (${createdAt.toISOString()})`;
+    this.logs.push({
+      id: this.logId++,
+      severity,
+      event_type: eventType,
+      details,
+      discord_attempt_count: 0,
+      discordDeliveryStatus: "pending",
+      nextAttemptAt: null,
+      lastError: null,
+      createdAt
+    });
   }
 
   private shortCode(code: string): string {

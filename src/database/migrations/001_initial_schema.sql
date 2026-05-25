@@ -87,19 +87,3 @@ CREATE TABLE IF NOT EXISTS panel_messages (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (guild_id, panel_type)
 );
-
-CREATE TABLE IF NOT EXISTS bot_logs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  severity ENUM('info', 'warn', 'error') NOT NULL,
-  event_type VARCHAR(80) NOT NULL,
-  discord_user_id VARCHAR(32) NULL,
-  referral_id BIGINT UNSIGNED NULL,
-  details TEXT NOT NULL,
-  discord_delivery_status ENUM('pending', 'sent', 'failed') NOT NULL DEFAULT 'pending',
-  discord_sent_at TIMESTAMP NULL,
-  discord_attempt_count INT UNSIGNED NOT NULL DEFAULT 0,
-  discord_next_attempt_at TIMESTAMP NULL,
-  discord_last_error TEXT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_bot_logs_dispatch (discord_delivery_status, discord_next_attempt_at)
-);
