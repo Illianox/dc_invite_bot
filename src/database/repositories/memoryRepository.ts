@@ -330,7 +330,14 @@ export class MemoryRepository implements Repository {
     referral.rewardStatus = "blocked";
     referral.blockedReason = reason;
     for (const step of this.steps.filter((entry) => entry.referralId === referralId && entry.status !== "paid")) step.status = "blocked";
-    this.addLog("warn", "referral_reward_blocked", `Spielerwerbung #${referralId} wurde blockiert.\nGrund: ${reason}`);
+    this.addLog("warn", "referral_reward_blocked", [
+      `Spielerwerbung #${referralId} wurde blockiert.`,
+      "",
+      ...this.referralIdentityLines(referral),
+      "",
+      "Grund:",
+      reason
+    ].join("\n"));
   }
 
   public async unblockRewardReferral(referralId: number, _actorId: string | null): Promise<void> {
@@ -339,7 +346,11 @@ export class MemoryRepository implements Repository {
     referral.rewardStatus = referral.startMinutes === null ? "pending" : "active";
     referral.blockedReason = null;
     for (const step of this.steps.filter((entry) => entry.referralId === referralId && entry.status === "blocked")) step.status = "pending";
-    this.addLog("info", "referral_reward_unblocked", `Spielerwerbung #${referralId} wurde entsperrt.`);
+    this.addLog("info", "referral_reward_unblocked", [
+      `Spielerwerbung #${referralId} wurde entsperrt.`,
+      "",
+      ...this.referralIdentityLines(referral)
+    ].join("\n"));
   }
 
   public async completeRewardReferral(referralId: number): Promise<void> {
@@ -521,6 +532,16 @@ export class MemoryRepository implements Repository {
 
   private displayUser(userId: string, userName: string | null): string {
     return userName ? `${userName} (${this.mention(userId)})` : this.mention(userId);
+  }
+
+  private referralIdentityLines(referral: Referral): string[] {
+    return [
+      "Eingeladener Spieler:",
+      this.displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
+      "",
+      "Eingeladen von:",
+      referral.inviterDiscordId ? this.displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt"
+    ];
   }
 
   private formatMinutes(minutes: number): string {

@@ -511,17 +511,30 @@ export class BotRepository implements Repository {
 
   public async blockRewardReferral(referralId: number, reason: string, actorId: string | null): Promise<void> {
     await this.inTransaction(async (connection) => {
+      const referral = await this.findReferralLogIdentity(connection, referralId);
       await connection.query("UPDATE referrals SET reward_status = 'blocked', blocked_reason = ? WHERE id = ?", [reason, referralId]);
       await connection.query("UPDATE referral_step_progress SET status = 'blocked' WHERE referral_id = ? AND status <> 'paid'", [referralId]);
-      await this.insertLog(connection, "warn", "referral_reward_blocked", actorId, referralId, `Spielerwerbung #${referralId} wurde blockiert.\nGrund: ${reason}`);
+      await this.insertLog(connection, "warn", "referral_reward_blocked", actorId, referralId, [
+        `Spielerwerbung #${referralId} wurde blockiert.`,
+        "",
+        ...this.referralIdentityLines(referral),
+        "",
+        "Grund:",
+        reason
+      ].join("\n"));
     });
   }
 
   public async unblockRewardReferral(referralId: number, actorId: string | null): Promise<void> {
     await this.inTransaction(async (connection) => {
+      const referral = await this.findReferralLogIdentity(connection, referralId);
       await connection.query("UPDATE referrals SET reward_status = CASE WHEN start_minutes IS NULL THEN 'pending' ELSE 'active' END, blocked_reason = NULL WHERE id = ? AND reward_status = 'blocked'", [referralId]);
       await connection.query("UPDATE referral_step_progress SET status = 'pending' WHERE referral_id = ? AND status = 'blocked'", [referralId]);
-      await this.insertLog(connection, "info", "referral_reward_unblocked", actorId, referralId, `Spielerwerbung #${referralId} wurde entsperrt.`);
+      await this.insertLog(connection, "info", "referral_reward_unblocked", actorId, referralId, [
+        `Spielerwerbung #${referralId} wurde entsperrt.`,
+        "",
+        ...this.referralIdentityLines(referral)
+      ].join("\n"));
     });
   }
 
@@ -718,6 +731,24 @@ export class BotRepository implements Repository {
     );
   }
 
+  private async findReferralLogIdentity(connection: PoolConnection, referralId: number): Promise<{
+    inviter_discord_id: string | null;
+    inviter_discord_name: string | null;
+    invitee_discord_id: string;
+    invitee_discord_name: string | null;
+  } | null> {
+    const [rows] = await connection.query<Array<RowDataPacket & {
+      inviter_discord_id: string | null;
+      inviter_discord_name: string | null;
+      invitee_discord_id: string;
+      invitee_discord_name: string | null;
+    }>>(
+      "SELECT inviter_discord_id, inviter_discord_name, invitee_discord_id, invitee_discord_name FROM referrals WHERE id = ? LIMIT 1",
+      [referralId]
+    );
+    return rows[0] ?? null;
+  }
+
   private async insertLog(
     _connection: PoolConnection,
     severity: "info" | "warn" | "error",
@@ -764,6 +795,22 @@ export class BotRepository implements Repository {
 
   private displayUser(userId: string, userName: string | null): string {
     return userName ? `${userName} (${this.mention(userId)})` : this.mention(userId);
+  }
+
+  private referralIdentityLines(referral: {
+    inviter_discord_id: string | null;
+    inviter_discord_name: string | null;
+    invitee_discord_id: string;
+    invitee_discord_name: string | null;
+  } | null): string[] {
+    if (!referral) return ["Eingeladener Spieler:", "unbekannt", "", "Eingeladen von:", "unbekannt"];
+    return [
+      "Eingeladener Spieler:",
+      this.displayUser(referral.invitee_discord_id, referral.invitee_discord_name),
+      "",
+      "Eingeladen von:",
+      referral.inviter_discord_id ? this.displayUser(referral.inviter_discord_id, referral.inviter_discord_name) : "unbekannt"
+    ];
   }
 
   private formatMinutes(minutes: number): string {
