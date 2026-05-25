@@ -95,7 +95,10 @@ export class InviteService {
   }
 
   private async processMemberJoin(member: GuildMember): Promise<void> {
-    const queueId = await this.repository.enqueueJoin(member.guild.id, member.id, member.joinedAt ?? new Date());
+    const displayName = member.displayName && member.displayName !== member.user.username
+      ? `${member.displayName} (${member.user.tag})`
+      : member.user.tag;
+    const queueId = await this.repository.enqueueJoin(member.guild.id, member.id, displayName, member.joinedAt ?? new Date());
     if (member.user.bot) {
       await this.repository.resolveQueuedJoin(queueId, {
         guildId: member.guild.id,

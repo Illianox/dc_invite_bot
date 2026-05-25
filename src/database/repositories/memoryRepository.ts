@@ -5,6 +5,7 @@ interface QueueItem {
   id: number;
   guildId: string;
   inviteeId: string;
+  inviteeName: string | null;
   joinedAt: Date;
   status: "queued" | "processing" | "resolved" | "failed";
   attemptCount: number;
@@ -86,9 +87,9 @@ export class MemoryRepository implements Repository {
     for (const [code, count] of uses) this.snapshots.set(code, { uses: count, capturedAt: new Date() });
   }
 
-  public async enqueueJoin(guildId: string, inviteeId: string, joinedAt: Date): Promise<number> {
+  public async enqueueJoin(guildId: string, inviteeId: string, inviteeName: string | null, joinedAt: Date): Promise<number> {
     const id = this.queueId++;
-    this.queue.push({ id, guildId, inviteeId, joinedAt, status: "queued", attemptCount: 0, error: null });
+    this.queue.push({ id, guildId, inviteeId, inviteeName, joinedAt, status: "queued", attemptCount: 0, error: null });
     return id;
   }
 

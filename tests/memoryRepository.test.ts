@@ -4,7 +4,7 @@ import { MemoryRepository } from "../src/database/repositories/memoryRepository.
 describe("MemoryRepository", () => {
   it("stores and ranks qualified referrals without a database", async () => {
     const repository = new MemoryRepository();
-    const queueId = await repository.enqueueJoin("guild", "invitee", new Date());
+    const queueId = await repository.enqueueJoin("guild", "invitee", "Invitee#0001", new Date());
     await repository.resolveQueuedJoin(queueId, {
       guildId: "guild",
       inviterId: "inviter",

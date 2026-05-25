@@ -47,7 +47,7 @@ async function qualifiedReferral(): Promise<{ repository: MemoryRepository; stat
   const repository = new MemoryRepository();
   repository.setRewardSteps(defaultRewardSteps);
   const stats = new MemoryPlayerStatsRepository();
-  const queueId = await repository.enqueueJoin("guild", "invited", new Date());
+  const queueId = await repository.enqueueJoin("guild", "invited", "Invited#0001", new Date());
   const referralId = await repository.resolveQueuedJoin(queueId, {
     guildId: "guild",
     inviterId: "inviter",
@@ -66,7 +66,7 @@ async function qualifiedReferral(): Promise<{ repository: MemoryRepository; stat
 }
 
 async function addQualifiedReferral(repository: MemoryRepository, inviteeId: string, inviterId: string): Promise<number> {
-  const queueId = await repository.enqueueJoin("guild", inviteeId, new Date());
+  const queueId = await repository.enqueueJoin("guild", inviteeId, `${inviteeId}#0001`, new Date());
   const referralId = await repository.resolveQueuedJoin(queueId, {
     guildId: "guild",
     inviterId,

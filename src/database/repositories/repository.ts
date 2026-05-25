@@ -26,7 +26,7 @@ export interface Repository {
   markInviteDeleted(invite: UserInvite): Promise<void>;
   loadSnapshotMap(): Promise<Map<string, number>>;
   saveSnapshots(uses: Map<string, number>, reason: "startup" | "join_processed" | "invite_created" | "recovery"): Promise<void>;
-  enqueueJoin(guildId: string, inviteeId: string, joinedAt: Date): Promise<number>;
+  enqueueJoin(guildId: string, inviteeId: string, inviteeName: string | null, joinedAt: Date): Promise<number>;
   recoverOpenJoins(guildId: string): Promise<number>;
   setQueueAttempt(id: number, attempt: number, nextAttemptAt: Date | null, error: string | null): Promise<void>;
   resolveQueuedJoin(

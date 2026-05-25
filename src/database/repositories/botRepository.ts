@@ -170,10 +170,10 @@ export class BotRepository implements Repository {
     });
   }
 
-  public async enqueueJoin(guildId: string, inviteeId: string, joinedAt: Date): Promise<number> {
+  public async enqueueJoin(guildId: string, inviteeId: string, inviteeName: string | null, joinedAt: Date): Promise<number> {
     const [result] = await this.pool.query<ResultSetHeader>(
-      "INSERT INTO join_processing_queue (guild_id, invitee_discord_id, joined_at) VALUES (?, ?, ?)",
-      [guildId, inviteeId, joinedAt]
+      "INSERT INTO join_processing_queue (guild_id, invitee_discord_id, invitee_discord_name, joined_at) VALUES (?, ?, ?, ?)",
+      [guildId, inviteeId, inviteeName, joinedAt]
     );
     return result.insertId;
   }

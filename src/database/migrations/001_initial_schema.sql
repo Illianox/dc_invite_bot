@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS join_processing_queue (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   guild_id VARCHAR(32) NOT NULL,
   invitee_discord_id VARCHAR(32) NOT NULL,
+  invitee_discord_name VARCHAR(100) NULL,
   joined_at TIMESTAMP NOT NULL,
   attempt_count INT UNSIGNED NOT NULL DEFAULT 0,
   next_attempt_at TIMESTAMP NULL,
