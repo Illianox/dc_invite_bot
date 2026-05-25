@@ -62,7 +62,7 @@ export function referralsPage(
   requesterId: string,
   referrals: Referral[],
   names: Map<string, string>,
-  playtimes: Map<string, number | null>,
+  earnedPlaytimes: Map<string, number | null>,
   page: number,
   expiresAt: number
 ): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
@@ -75,8 +75,8 @@ export function referralsPage(
         .map((referral, index) => {
           const position = safePage * pageSize + index + 1;
           const name = names.get(referral.inviteeDiscordId) ?? `<@${referral.inviteeDiscordId}>`;
-          const playtime = formatPlaytime(playtimes.get(referral.inviteeDiscordId) ?? null);
-          return `**${position}.** ${name} - <t:${Math.floor(referral.joinedAt.getTime() / 1000)}:d> - Spielzeit: **${playtime}**`;
+          const playtime = formatPlaytime(earnedPlaytimes.get(referral.inviteeDiscordId) ?? null);
+          return `**${position}.** ${name} - <t:${Math.floor(referral.joinedAt.getTime() / 1000)}:d> - Seit Aktivierung: **${playtime}**`;
         })
         .join("\n")
     : "Du hast aktuell keine erfolgreichen Spielerwerbungen.";

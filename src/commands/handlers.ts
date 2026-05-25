@@ -267,16 +267,16 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
     }
     const data = await deps.referrals.listForInviter(interaction.guildId, member.id);
     const names = new Map<string, string>();
-    const playtimes = new Map<string, number | null>();
+    const earnedPlaytimes = new Map<string, number | null>();
     for (const referral of data) {
-      const [referredMember, minutesPlayed] = await Promise.all([
+      const [referredMember, earnedMinutes] = await Promise.all([
         interaction.guild!.members.fetch(referral.inviteeDiscordId).catch(() => null),
-        currentPlaytimeMinutes(referral, deps.playerStats)
+        earnedPlaytimeMinutes(referral, deps.playerStats)
       ]);
       names.set(referral.inviteeDiscordId, referredMember?.displayName ?? `<@${referral.inviteeDiscordId}>`);
-      playtimes.set(referral.inviteeDiscordId, minutesPlayed);
+      earnedPlaytimes.set(referral.inviteeDiscordId, earnedMinutes);
     }
-    const payload = referralsPage(interaction.user.id, data, names, playtimes, requestedPage, expiresAt);
+    const payload = referralsPage(interaction.user.id, data, names, earnedPlaytimes, requestedPage, expiresAt);
     if (interaction.customId.startsWith("referrals:page:")) {
       await interaction.update(payload);
     } else {
@@ -285,10 +285,12 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
   }
 }
 
-async function currentPlaytimeMinutes(referral: Referral, stats: PlayerStatsReader): Promise<number | null> {
+async function earnedPlaytimeMinutes(referral: Referral, stats: PlayerStatsReader): Promise<number | null> {
   try {
+    if (referral.startMinutes === null) return null;
     const eosId = referral.invitedEosId ?? await stats.findEosId(referral.inviteeDiscordId);
-    return eosId ? await stats.getMinutesPlayed(eosId) : null;
+    const currentMinutes = eosId ? await stats.getMinutesPlayed(eosId) : null;
+    return currentMinutes === null ? null : currentMinutes - referral.startMinutes;
   } catch {
     return null;
   }
