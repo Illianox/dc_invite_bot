@@ -102,6 +102,13 @@ nicht gegenseitig.
 Mit `RANKING_DISPLAY_LIMIT` in `.env` stellst du ein, wie viele Plaetze
 angezeigt werden, zum Beispiel `3`, `10` oder `25`.
 
+## Panel-Banner
+
+Mit `PANEL_BANNER_URL` in `.env` kannst du ein grosses Header-Bild ueber dem
+Discord-Panel anzeigen. Der Wert sollte eine direkt erreichbare `https://`-URL
+zu einem Bild sein. Wenn der Wert leer bleibt, wird das Panel ohne Banner
+veroeffentlicht.
+
 ## Willkommensnachrichten
 
 Wenn ein neues Mitglied eindeutig ueber einen verwalteten Invite-Link beitritt,

@@ -10,25 +10,34 @@ import type { RankingScope } from "../services/referralService.js";
 import type { Referral } from "../utils/domain.js";
 
 export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
+  const bannerEmbed = env.PANEL_BANNER_URL
+    ? new EmbedBuilder()
+        .setColor(0x8f0d18)
+        .setImage(env.PANEL_BANNER_URL)
+    : null;
   const embed = new EmbedBuilder()
-    .setColor(0x241722)
-    .setTitle("Blacklist Spieler werben Spieler System")
+    .setColor(0x8f0d18)
+    .setTitle("Blacklist Spieler werben Spieler")
     .setDescription(
       [
-        "1. Verknuepfe deinen Discord-Account ueber das bestehende Blacklist-Link-System.",
+        "**1. Verknuepfen**",
+        "Verknuepfe deinen Discord-Account ueber das bestehende Blacklist-Link-System.",
         "",
-        "2. Sobald du die Rolle **Linked** besitzt, kannst du deinen persoenlichen Einladungslink abrufen.",
+        "**2. Einladungslink abrufen**",
+        "Sobald du die Rolle **Linked** besitzt, kannst du deinen persoenlichen Einladungslink abrufen.",
         "",
-        "3. Erfolgreiche Einladungen zaehlen, sobald das neue Mitglied ebenfalls **Linked** ist.",
+        "**3. Spieler werben**",
+        "Erfolgreiche Einladungen zaehlen, sobald das neue Mitglied ebenfalls **Linked** ist.",
         "",
-        "4. Ueber **Meine geworbenen Spieler** siehst du deine erfolgreichen Spielerwerbungen privat."
+        "**4. Fortschritt pruefen**",
+        "Ueber **Meine geworbenen Spieler** siehst du deine erfolgreichen Spielerwerbungen privat."
       ].join("\n")
     )
     .setFooter({ text: "Spieler werben Spieler | Blacklist" });
   if (env.PANEL_THUMBNAIL_URL) embed.setThumbnail(env.PANEL_THUMBNAIL_URL);
 
   return {
-    embeds: [embed],
+    embeds: bannerEmbed ? [bannerEmbed, embed] : [embed],
     components: [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),

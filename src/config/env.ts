@@ -19,6 +19,7 @@ const schema = z.object({
   WELCOME_CHANNEL_ID: z.string().min(1),
   ADMIN_LOG_CHANNEL_ID: z.string().min(1),
   LINKED_ROLE_ID: z.string().min(1),
+  PANEL_BANNER_URL: z.string().url().optional().or(z.literal("")),
   PANEL_THUMBNAIL_URL: z.string().url().optional().or(z.literal("")),
   MYSQL_HOST: z.string().default("127.0.0.1"),
   MYSQL_PORT: positiveInt.default(3306),
