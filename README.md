@@ -70,6 +70,10 @@ npm start
 Setze fuer den Echtbetrieb `DATA_MODE=mysql` und trage vor `migrate`,
 `deploy:commands` und `start` alle Datenbankwerte in `.env` ein.
 Die Migration erstellt ausschliesslich Bot-eigene Tabellen.
+Falls CrossChat-Spielerverknuepfungen in einer separaten Datenbank liegen,
+setze z. B. `CROSSCHAT_DATABASE=blacklist` und
+`CROSSCHAT_TABLE=crosschat_players`. Der Bot fragt dann
+`blacklist.crosschat_players` ab.
 Der Produktionsbuild startet aus `dist/src/index.js`, da die Testquellen im
 gleichen TypeScript-Projekt mitgeprueft werden.
 

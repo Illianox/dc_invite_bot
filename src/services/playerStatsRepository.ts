@@ -7,7 +7,7 @@ export interface PlayerStatsReader {
 }
 
 export class MySqlPlayerStatsRepository implements PlayerStatsReader {
-  private readonly linkTable = sqlIdentifier(env.PLAYER_LINK_TABLE);
+  private readonly linkTable = sqlTableIdentifier(env.CROSSCHAT_DATABASE, env.CROSSCHAT_TABLE || env.PLAYER_LINK_TABLE);
   private readonly linkDiscordColumn = sqlIdentifier(env.PLAYER_LINK_DISCORD_ID_COLUMN);
   private readonly linkEosColumn = sqlIdentifier(env.PLAYER_LINK_EOS_ID_COLUMN);
   private readonly playtimeTable = sqlIdentifier(env.PLAYTIME_TABLE);
@@ -17,7 +17,7 @@ export class MySqlPlayerStatsRepository implements PlayerStatsReader {
   public constructor(private readonly pool: Pool) {}
 
   public async findEosId(discordId: string): Promise<string | null> {
-    if (!env.PLAYER_LINK_TABLE) return null;
+    if (!this.linkTable) return null;
     const [rows] = await this.pool.query<Array<RowDataPacket & { eos_id: string }>>(
       `SELECT ${this.linkEosColumn} AS eos_id FROM ${this.linkTable} WHERE ${this.linkDiscordColumn} = ? LIMIT 1`,
       [discordId]
@@ -54,6 +54,12 @@ export class MemoryPlayerStatsRepository implements PlayerStatsReader {
   public async getMinutesPlayed(eosId: string): Promise<number | null> {
     return this.minutes.get(eosId) ?? null;
   }
+}
+
+function sqlTableIdentifier(database: string, table: string): string {
+  if (!table) return "";
+  if (!database) return sqlIdentifier(table);
+  return `${sqlIdentifier(database)}.${sqlIdentifier(table)}`;
 }
 
 function sqlIdentifier(value: string): string {

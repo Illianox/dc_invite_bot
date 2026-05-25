@@ -36,6 +36,8 @@ const schema = z.object({
   WELCOME_MESSAGE_ENABLED: booleanFlag.default(true),
   ADMIN_COMMAND_COOLDOWN_MS: positiveInt.default(5_000),
   PAGINATION_TIMEOUT_MS: positiveInt.default(120_000),
+  CROSSCHAT_DATABASE: z.string().default(""),
+  CROSSCHAT_TABLE: z.string().default(""),
   PLAYER_LINK_TABLE: z.string().default(""),
   PLAYER_LINK_DISCORD_ID_COLUMN: z.string().default("discord_id"),
   PLAYER_LINK_EOS_ID_COLUMN: z.string().default("eos_id"),
