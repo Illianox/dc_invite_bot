@@ -16,9 +16,9 @@ const rankingScopeOption = (command: any) =>
 export const commandDefinitions = [
   new SlashCommandBuilder()
     .setName("panel")
-    .setDescription("Verwaltet das Invite-Panel.")
+    .setDescription("Verwaltet das Spieler werben Spieler Panel.")
     .setDefaultMemberPermissions(adminPermission)
-    .addSubcommand((command) => command.setName("publish").setDescription("Veroeffentlicht oder aktualisiert das Invite-Panel.")),
+    .addSubcommand((command) => command.setName("publish").setDescription("Veroeffentlicht oder aktualisiert das Spieler werben Spieler Panel.")),
   rankingScopeOption(
     new SlashCommandBuilder()
       .setName("rangliste")
@@ -27,35 +27,35 @@ export const commandDefinitions = [
   ),
   new SlashCommandBuilder()
     .setName("referral")
-    .setDescription("Administriert Referral-Faelle.")
+    .setDescription("Administriert Spieler werben Spieler Faelle.")
     .setDefaultMemberPermissions(adminPermission)
-    .addSubcommand((command) => command.setName("list").setDescription("Zeigt offene und aktive Reward-Referrals."))
+    .addSubcommand((command) => command.setName("list").setDescription("Zeigt offene und aktive Spielerwerbungen."))
     .addSubcommand((command) =>
-      command.setName("info").setDescription("Zeigt Reward-Details eines Mitglieds.")
+      command.setName("info").setDescription("Zeigt Spielerwerbungs-Fortschritt eines Mitglieds.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
     )
     .addSubcommand((command) =>
-      command.setName("block").setDescription("Blockiert ein Reward-Referral.")
+      command.setName("block").setDescription("Blockiert eine Spielerwerbung.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
         .addStringOption((option) => option.setName("grund").setDescription("Grund").setRequired(true))
     )
     .addSubcommand((command) =>
-      command.setName("unblock").setDescription("Entsperrt ein Reward-Referral.")
+      command.setName("unblock").setDescription("Entsperrt eine Spielerwerbung.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
     )
-    .addSubcommand((command) => command.setName("forcecheck").setDescription("Prueft alle aktiven Reward-Referrals sofort."))
+    .addSubcommand((command) => command.setName("forcecheck").setDescription("Prueft alle aktiven Spielerwerbungen sofort."))
     .addSubcommand((command) =>
-      command.setName("forcereward").setDescription("Zahlt eine Reward-Etappe manuell aus.")
+      command.setName("forcereward").setDescription("Verarbeitet eine Etappe manuell.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
-        .addStringOption((option) => option.setName("step_key").setDescription("Reward-Etappe").setRequired(true))
+        .addStringOption((option) => option.setName("step_key").setDescription("Etappe").setRequired(true))
     )
-    .addSubcommand((command) => command.setName("reload").setDescription("Laedt die Reward-Config neu."))
+    .addSubcommand((command) => command.setName("reload").setDescription("Laedt die Spielerwerbungs-Config neu."))
     .addSubcommand((command) =>
       command.setName("inspect").setDescription("Zeigt die Historie eines Mitglieds.")
         .addUserOption((option) => option.setName("member").setDescription("Mitglied").setRequired(true))
     )
     .addSubcommand((command) =>
-      command.setName("assign").setDescription("Ordnet einen ungeklaerten Join manuell zu.")
+      command.setName("assign").setDescription("Ordnet einen ungeklaerten Beitritt manuell zu.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
         .addUserOption((option) => option.setName("inviter").setDescription("Werber").setRequired(true))
         .addStringOption((option) => option.setName("reason").setDescription("Begruendung").setRequired(true))

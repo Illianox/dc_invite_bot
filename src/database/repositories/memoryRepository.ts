@@ -67,13 +67,13 @@ export class MemoryRepository implements Repository {
       createdAt: new Date()
     });
     this.snapshots.set(inviteCode, { uses: knownUses, capturedAt: new Date() });
-    this.addLog("info", "invite_created", `Invite ${this.shortCode(inviteCode)} wurde von ${this.mention(inviterId)} erstellt.`);
+    this.addLog("info", "invite_created", `Einladungslink ${this.shortCode(inviteCode)} wurde von ${this.mention(inviterId)} erstellt.`);
   }
 
   public async markInviteDeleted(invite: UserInvite): Promise<void> {
     const stored = this.invites.find((entry) => entry.id === invite.id && entry.status === "active");
     if (stored) stored.status = "deleted";
-    this.addLog("warn", "invite_deleted", `Invite ${this.shortCode(invite.inviteCode)} von ${this.mention(invite.inviterDiscordId)} existiert nicht mehr.`);
+    this.addLog("warn", "invite_deleted", `Einladungslink ${this.shortCode(invite.inviteCode)} von ${this.mention(invite.inviterDiscordId)} existiert nicht mehr.`);
   }
 
   public async loadSnapshotMap(): Promise<Map<string, number>> {
@@ -99,7 +99,9 @@ export class MemoryRepository implements Repository {
       await this.resolveQueuedJoin(item.id, {
         guildId,
         inviterId: null,
+        inviterName: null,
         inviteeId: item.inviteeId,
+        inviteeName: item.inviteeName,
         inviteCode: null,
         joinedAt: item.joinedAt,
         status: "unresolved",
@@ -124,7 +126,9 @@ export class MemoryRepository implements Repository {
     data: {
       guildId: string;
       inviterId: string | null;
+      inviterName: string | null;
       inviteeId: string;
+      inviteeName: string | null;
       inviteCode: string | null;
       joinedAt: Date;
       status: ReferralStatus;
@@ -133,13 +137,15 @@ export class MemoryRepository implements Repository {
     snapshots: Map<string, number>
   ): Promise<number> {
     if (["pending", "qualified", "unqualified"].includes(data.status) && await this.findCurrentReferral(data.guildId, data.inviteeId)) {
-      throw new Error("A running referral already exists for this member.");
+      throw new Error("Dieses Mitglied hat bereits eine laufende Spielerwerbung.");
     }
     const referral: Referral = {
       id: this.referralId++,
       guildId: data.guildId,
       inviterDiscordId: data.inviterId,
+      inviterDiscordName: data.inviterName,
       inviteeDiscordId: data.inviteeId,
+      inviteeDiscordName: data.inviteeName,
       inviteCode: data.inviteCode,
       joinedAt: data.joinedAt,
       status: data.status,
@@ -179,7 +185,7 @@ export class MemoryRepository implements Repository {
 
   public async transitionReferral(referral: Referral, nextStatus: ReferralStatus, eventType: string, actorId: string | null, reason: string): Promise<void> {
     const stored = this.referrals.find((entry) => entry.id === referral.id && entry.status === referral.status);
-    if (!stored) throw new Error("Referral changed before the requested transition could be applied.");
+    if (!stored) throw new Error("Spielerwerbung wurde geaendert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
     const oldStatus = stored.status;
     stored.status = nextStatus;
     if (nextStatus === "qualified" && !stored.qualifiedAt) stored.qualifiedAt = new Date();
@@ -188,11 +194,13 @@ export class MemoryRepository implements Repository {
     this.addLog("info", eventType, this.referralLogDetails(stored.inviteeDiscordId, stored.inviterDiscordId, nextStatus, reason));
   }
 
-  public async assignReferral(referral: Referral, inviterId: string, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void> {
+  public async assignReferral(referral: Referral, inviterId: string, inviterName: string | null, inviteeName: string | null, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void> {
     const stored = this.referrals.find((entry) => entry.id === referral.id && ["unresolved", "non_referral"].includes(entry.status));
-    if (!stored) throw new Error("Referral is no longer assignable.");
+    if (!stored) throw new Error("Spielerwerbung kann nicht mehr zugeordnet werden.");
     const oldStatus = stored.status;
     stored.inviterDiscordId = inviterId;
+    stored.inviterDiscordName = inviterName;
+    stored.inviteeDiscordName = inviteeName ?? stored.inviteeDiscordName;
     stored.status = nextStatus;
     stored.qualifiedAt = nextStatus === "qualified" ? new Date() : null;
     this.events.push({ referralId: stored.id, eventType: "admin_assign", oldStatus, newStatus: nextStatus, actorId: adminId, reason, createdAt: new Date() });
@@ -267,7 +275,7 @@ export class MemoryRepository implements Repository {
     );
   }
 
-  public async rememberPlayerIdentity(guildId: string, discordId: string, eosId: string): Promise<void> {
+  public async rememberPlayerIdentity(guildId: string, discordId: string, _discordName: string | null, eosId: string): Promise<void> {
     this.identities.set(`${guildId}:${discordId}`, eosId);
   }
 
@@ -293,7 +301,19 @@ export class MemoryRepository implements Repository {
     referral.startMinutes = startMinutes;
     referral.rewardStatus = "active";
     referral.blockedReason = null;
-    this.addLog("info", "referral_reward_active", `Referral #${referralId} wurde fuer Rewards aktiviert. Start-Minuten: ${startMinutes}.`);
+    this.addLog("info", "referral_reward_active", [
+      "Eingeladener Spieler:",
+      this.displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
+      "",
+      "Eingeladen von:",
+      referral.inviterDiscordId ? this.displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
+      "",
+      "Start-Spielzeit:",
+      this.formatMinutes(startMinutes),
+      "",
+      "Status:",
+      "Spieler wurde erfolgreich zugeordnet."
+    ].join("\n"));
     return true;
   }
 
@@ -310,7 +330,7 @@ export class MemoryRepository implements Repository {
     referral.rewardStatus = "blocked";
     referral.blockedReason = reason;
     for (const step of this.steps.filter((entry) => entry.referralId === referralId && entry.status !== "paid")) step.status = "blocked";
-    this.addLog("warn", "referral_reward_blocked", `Referral #${referralId} wurde blockiert.\nGrund: ${reason}`);
+    this.addLog("warn", "referral_reward_blocked", `Spielerwerbung #${referralId} wurde blockiert.\nGrund: ${reason}`);
   }
 
   public async unblockRewardReferral(referralId: number, _actorId: string | null): Promise<void> {
@@ -319,7 +339,7 @@ export class MemoryRepository implements Repository {
     referral.rewardStatus = referral.startMinutes === null ? "pending" : "active";
     referral.blockedReason = null;
     for (const step of this.steps.filter((entry) => entry.referralId === referralId && entry.status === "blocked")) step.status = "pending";
-    this.addLog("info", "referral_reward_unblocked", `Referral #${referralId} wurde entsperrt.`);
+    this.addLog("info", "referral_reward_unblocked", `Spielerwerbung #${referralId} wurde entsperrt.`);
   }
 
   public async completeRewardReferral(referralId: number): Promise<void> {
@@ -407,7 +427,9 @@ export class MemoryRepository implements Repository {
     for (const referral of this.referrals) {
       if (["left", "revoked"].includes(referral.status) && (referral.leftAt?.getTime() ?? referral.joinedAt.getTime()) < cutoff) {
         referral.inviterDiscordId = null;
+        referral.inviterDiscordName = null;
         referral.inviteeDiscordId = `anon-${referral.id}`;
+        referral.inviteeDiscordName = null;
         referral.inviteCode = null;
       }
     }
@@ -486,15 +508,25 @@ export class MemoryRepository implements Repository {
 
   private referralLogDetails(inviteeId: string, inviterId: string | null, status: ReferralStatus, reason: string): string {
     const statusLine = status === "pending"
-      ? "Status: Wartet auf Verifizierung"
+      ? "Status:\nSpielerwerbung wartet auf Verifizierung."
       : status === "qualified"
-        ? "Status: Erfolgreich verifiziert, Einladung wird jetzt gezaehlt"
-        : `Grund: ${reason}`;
+        ? "Status:\nSpielerwerbung erfolgreich."
+        : `Grund:\n${reason}`;
     return [
-      `Eingeladenes Mitglied: ${this.mention(inviteeId)}`,
-      `Eingeladen von: ${inviterId ? this.mention(inviterId) : "unbekannt"}`,
+      `Eingeladener Spieler:\n${this.mention(inviteeId)}`,
+      `Eingeladen von:\n${inviterId ? this.mention(inviterId) : "unbekannt"}`,
       statusLine
     ].join("\n");
+  }
+
+  private displayUser(userId: string, userName: string | null): string {
+    return userName ? `${userName} (${this.mention(userId)})` : this.mention(userId);
+  }
+
+  private formatMinutes(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return `${hours} Stunden ${remaining} Minuten`;
   }
 
   private mention(userId: string): string {

@@ -49,12 +49,12 @@ export class ReferralRewardService {
   public async forceReward(guildId: string, inviteeId: string, stepKey: string): Promise<string> {
     const config = await this.currentConfig();
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
-    if (!referral) return "Keine Referral-Daten fuer dieses Mitglied gefunden.";
+    if (!referral) return "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.";
     const step = (await this.repository.listRewardSteps()).find((entry) => entry.key === stepKey);
-    if (!step) return `Unbekannte Reward-Etappe: ${stepKey}`;
+    if (!step) return `Unbekannte Etappe: ${stepKey}`;
     await this.ensureActive(referral);
     const fresh = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
-    if (!fresh || fresh.rewardStatus !== "active") return "Referral ist nicht aktiv oder wurde blockiert.";
+    if (!fresh || fresh.rewardStatus !== "active") return "Spielerwerbung ist nicht aktiv oder wurde blockiert.";
     await this.repository.resetStepForRetry(fresh.id, step.key);
     const progress = await this.repository.ensureStepProgress(fresh.id, step.key, step.requiredMinutes);
     if (progress.status === "paid") return "Diese Etappe wurde bereits ausgezahlt.";
@@ -78,19 +78,19 @@ export class ReferralRewardService {
 
   public async info(guildId: string, inviteeId: string): Promise<string> {
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
-    if (!referral) return "Keine Referral-Daten fuer dieses Mitglied gefunden.";
+    if (!referral) return "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.";
     const current = referral.invitedEosId ? await this.stats.getMinutesPlayed(referral.invitedEosId) : null;
     const progress = await this.repository.listStepProgress(referral.id);
     return [
-      `Referral #${referral.id}`,
-      `Inviter: ${referral.inviterDiscordId ? `<@${referral.inviterDiscordId}>` : "unbekannt"}`,
-      `Invited: <@${referral.inviteeDiscordId}>`,
-      `Status: ${referral.status} / Reward: ${referral.rewardStatus}`,
-      `Inviter EOS: ${referral.inviterEosId ?? "unbekannt"}`,
-      `Invited EOS: ${referral.invitedEosId ?? "unbekannt"}`,
-      `Start-Minuten: ${referral.startMinutes ?? "unbekannt"}`,
-      `Aktuelle MinutesPlayed: ${current ?? "unbekannt"}`,
-      `Spielzeit seit Invite: ${current !== null && referral.startMinutes !== null ? current - referral.startMinutes : "unbekannt"}`,
+      `Spielerwerbungs-Fortschritt #${referral.id}`,
+      `Eingeladen von: ${referral.inviterDiscordId ? `<@${referral.inviterDiscordId}>` : "unbekannt"}`,
+      `Eingeladener Spieler: <@${referral.inviteeDiscordId}>`,
+      `Status: ${statusLabel(referral.status)} / ${statusLabel(referral.rewardStatus)}`,
+      `Werber EOS: ${referral.inviterEosId ?? "unbekannt"}`,
+      `Geworbener Spieler EOS: ${referral.invitedEosId ?? "unbekannt"}`,
+      `Start-Spielzeit: ${formatOptionalMinutes(referral.startMinutes)}`,
+      `Aktuelle Spielzeit: ${formatOptionalMinutes(current)}`,
+      `Spielzeit seit Start: ${current !== null && referral.startMinutes !== null ? current - referral.startMinutes : "unbekannt"}`,
       `Etappen: ${progress.length ? progress.map((step) => `${step.stepKey}:${step.status}`).join(", ") : "noch keine"}`
     ].join("\n");
   }
@@ -106,14 +106,14 @@ export class ReferralRewardService {
     for (const step of rewardSteps) {
       const progress = await this.repository.ensureStepProgress(currentReferral.id, step.key, step.requiredMinutes);
       if (!this.isPayable(progress) || earnedMinutes < step.requiredMinutes) continue;
-      await this.repository.logInfo("referral_reward_step_reached", currentReferral.inviteeDiscordId, currentReferral.id, `Referral #${currentReferral.id} hat Etappe ${step.key} erreicht. Spielzeit seit Invite: ${earnedMinutes} Minuten.`);
+      await this.repository.logInfo("referral_reward_step_reached", currentReferral.inviteeDiscordId, currentReferral.id, `Spielerwerbungs-Fortschritt #${currentReferral.id}: Etappe ${step.key} erreicht. Spielzeit seit Start: ${earnedMinutes} Minuten.`);
       if (await this.payStep(currentReferral, step, progress, config, false)) paid++;
     }
     const allProgress = await this.repository.listStepProgress(currentReferral.id);
     const allPaid = rewardSteps.length > 0 && rewardSteps.every((step) => allProgress.some((progress) => progress.stepKey === step.key && progress.status === "paid"));
     if (allPaid) {
       await this.repository.completeRewardReferral(currentReferral.id);
-      await this.repository.logInfo("referral_reward_completed", currentReferral.inviteeDiscordId, currentReferral.id, `Referral #${currentReferral.id} wurde abgeschlossen.`);
+      await this.repository.logInfo("referral_reward_completed", currentReferral.inviteeDiscordId, currentReferral.id, `Spielerwerbung #${currentReferral.id} wurde abgeschlossen.`);
     }
     return paid;
   }
@@ -121,21 +121,21 @@ export class ReferralRewardService {
   private async ensureActive(referral: Referral): Promise<void> {
     if (referral.rewardStatus !== "pending") return;
     if (!referral.inviterDiscordId || await this.repository.hasExistingRewardReferral(referral.guildId, referral.inviteeDiscordId, referral.id)) {
-      await this.repository.blockRewardReferral(referral.id, "Eingeladener Spieler hat bereits ein Reward-Referral oder der Inviter ist unbekannt.", null);
+      await this.repository.blockRewardReferral(referral.id, "Eingeladener Spieler hat bereits eine Spielerwerbung oder der Werber ist unbekannt.", null);
       return;
     }
     const [inviterEosId, invitedEosId] = await Promise.all([
-      this.findAndRememberEosId(referral.guildId, referral.inviterDiscordId),
-      this.findAndRememberEosId(referral.guildId, referral.inviteeDiscordId)
+      this.findAndRememberEosId(referral.guildId, referral.inviterDiscordId, referral.inviterDiscordName),
+      this.findAndRememberEosId(referral.guildId, referral.inviteeDiscordId, referral.inviteeDiscordName)
     ]);
     await this.repository.updateRewardEos(referral.id, inviterEosId, invitedEosId);
     if (!inviterEosId || !invitedEosId) return;
     if (inviterEosId === invitedEosId) {
-      await this.repository.blockRewardReferral(referral.id, "Inviter und Invited haben dieselbe EOS ID.", null);
+      await this.repository.blockRewardReferral(referral.id, "Werber und geworbener Spieler haben dieselbe EOS ID.", null);
       return;
     }
     if (await this.repository.hasExistingRewardReferralForEos(referral.guildId, invitedEosId, referral.id)) {
-      await this.repository.blockRewardReferral(referral.id, "Diese EOS ID wurde bereits fuer ein Reward-Referral verwendet.", null);
+      await this.repository.blockRewardReferral(referral.id, "Diese EOS ID wurde bereits fuer eine Spielerwerbung verwendet.", null);
       return;
     }
     if (await this.repository.hasRememberedEosId(referral.guildId, invitedEosId, referral.inviteeDiscordId)) {
@@ -145,13 +145,13 @@ export class ReferralRewardService {
     const startMinutes = await this.stats.getMinutesPlayed(invitedEosId);
     if (startMinutes === null) return;
     await this.repository.activateRewardReferral(referral.id, inviterEosId, invitedEosId, startMinutes);
-    await this.repository.logInfo("referral_reward_start_minutes_saved", referral.inviteeDiscordId, referral.id, `start_minutes fuer Referral #${referral.id} gespeichert: ${startMinutes}.`);
+    await this.repository.logInfo("referral_reward_start_minutes_saved", referral.inviteeDiscordId, referral.id, `Start-Spielzeit fuer Spielerwerbung #${referral.id} gespeichert: ${startMinutes} Minuten.`);
   }
 
-  private async findAndRememberEosId(guildId: string, discordId: string): Promise<string | null> {
+  private async findAndRememberEosId(guildId: string, discordId: string, discordName: string | null): Promise<string | null> {
     const live = await this.stats.findEosId(discordId);
     if (live) {
-      await this.repository.rememberPlayerIdentity(guildId, discordId, live);
+      await this.repository.rememberPlayerIdentity(guildId, discordId, discordName, live);
       return live;
     }
     return this.repository.findRememberedEosId(guildId, discordId);
@@ -196,7 +196,7 @@ export class ReferralRewardService {
         config.dryRun ? "referral_reward_dry_run" : "referral_reward_paid",
         referral.inviteeDiscordId,
         referral.id,
-        `${mode}Referral Belohnung ausgezahlt\nInviter: <@${referral.inviterDiscordId}>\nInvited: <@${referral.inviteeDiscordId}>\nEtappe: ${step.key}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgeloest." : ""}`
+        `${mode}Spielerwerbung verarbeitet\nEingeladen von: <@${referral.inviterDiscordId}>\nEingeladener Spieler: <@${referral.inviteeDiscordId}>\nEtappe: ${step.key}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgeloest." : ""}`
       );
       if (config.dryRun) return false;
       await this.repository.markStepPaid(referral.id, step.key);
@@ -218,10 +218,10 @@ export class ReferralRewardService {
       const nextAttempt = progress.attemptCount + 1;
       if (nextAttempt >= config.maxRetryAttempts) {
         await this.repository.markStepFailed(referral.id, step.key, nextAttempt, message);
-        await this.repository.logError("referral_reward_failed", `Referral #${referral.id}, Etappe ${step.key}: ${message}`);
+        await this.repository.logError("referral_reward_failed", `Spielerwerbung #${referral.id}, Etappe ${step.key}: ${message}`);
       } else {
         await this.repository.markStepRetry(referral.id, step.key, nextAttempt, new Date(Date.now() + config.retryDelaySeconds * 1000), message);
-        await this.repository.logError("referral_reward_retry", `Referral #${referral.id}, Etappe ${step.key}: Versuch ${nextAttempt}/${config.maxRetryAttempts} fehlgeschlagen. ${message}`);
+        await this.repository.logError("referral_reward_retry", `Spielerwerbung #${referral.id}, Etappe ${step.key}: Versuch ${nextAttempt}/${config.maxRetryAttempts} fehlgeschlagen. ${message}`);
       }
       return false;
     }
@@ -234,4 +234,30 @@ function renderCommand(template: string, eosId: string, discordId: string, refer
     .replaceAll("{discord_id}", discordId)
     .replaceAll("{referral_id}", String(referralId))
     .replaceAll("{step_key}", stepKey);
+}
+
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    active: "aktiv",
+    blocked: "blockiert",
+    completed: "abgeschlossen",
+    failed: "fehlgeschlagen",
+    left: "verlassen",
+    non_referral: "keine Spielerwerbung",
+    paid: "verarbeitet",
+    pending: "wartend",
+    qualified: "erfolgreich",
+    retry: "erneuter Versuch",
+    revoked: "widerrufen",
+    unqualified: "nicht erfolgreich",
+    unresolved: "unklar"
+  };
+  return labels[status] ?? status;
+}
+
+function formatOptionalMinutes(minutes: number | null): string {
+  if (minutes === null) return "unbekannt";
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
+  return `${hours} Stunden ${remaining} Minuten`;
 }

@@ -34,7 +34,9 @@ export interface Repository {
     data: {
       guildId: string;
       inviterId: string | null;
+      inviterName: string | null;
       inviteeId: string;
+      inviteeName: string | null;
       inviteCode: string | null;
       joinedAt: Date;
       status: ReferralStatus;
@@ -45,7 +47,7 @@ export interface Repository {
   findCurrentReferral(guildId: string, inviteeId: string): Promise<Referral | null>;
   findLatestAssignableReferral(guildId: string, inviteeId: string): Promise<Referral | null>;
   transitionReferral(referral: Referral, nextStatus: ReferralStatus, eventType: string, actorId: string | null, reason: string): Promise<void>;
-  assignReferral(referral: Referral, inviterId: string, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void>;
+  assignReferral(referral: Referral, inviterId: string, inviterName: string | null, inviteeName: string | null, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void>;
   listQualifiedByInviter(guildId: string, inviterId: string): Promise<Referral[]>;
   getRanking(guildId: string, period: { start: Date; end: Date } | null, limit: number): Promise<Array<{ inviterId: string; total: number }>>;
   listReferralHistory(guildId: string, inviteeId: string): Promise<Referral[]>;
@@ -55,7 +57,7 @@ export interface Repository {
   findRewardReferralByInvitee(guildId: string, inviteeId: string): Promise<Referral | null>;
   hasExistingRewardReferral(guildId: string, inviteeId: string, excludeReferralId?: number): Promise<boolean>;
   hasExistingRewardReferralForEos(guildId: string, invitedEosId: string, excludeReferralId?: number): Promise<boolean>;
-  rememberPlayerIdentity(guildId: string, discordId: string, eosId: string): Promise<void>;
+  rememberPlayerIdentity(guildId: string, discordId: string, discordName: string | null, eosId: string): Promise<void>;
   findRememberedEosId(guildId: string, discordId: string): Promise<string | null>;
   hasRememberedEosId(guildId: string, eosId: string, excludeDiscordId?: string): Promise<boolean>;
   activateRewardReferral(referralId: number, inviterEosId: string, invitedEosId: string, startMinutes: number): Promise<boolean>;

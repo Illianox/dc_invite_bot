@@ -12,7 +12,7 @@ import type { Referral } from "../utils/domain.js";
 export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuilder<ButtonBuilder>[] } {
   const embed = new EmbedBuilder()
     .setColor(0x241722)
-    .setTitle("Blacklist Invite-System")
+    .setTitle("Blacklist Spieler werben Spieler System")
     .setDescription(
       [
         "1. Verknuepfe deinen Discord-Account ueber das bestehende Blacklist-Link-System.",
@@ -21,18 +21,18 @@ export function mainPanel(): { embeds: EmbedBuilder[]; components: ActionRowBuil
         "",
         "3. Erfolgreiche Einladungen zaehlen, sobald das neue Mitglied ebenfalls **Linked** ist.",
         "",
-        "4. Ueber **Meine Einladungen** siehst du deine gueltigen Referrals privat."
+        "4. Ueber **Meine geworbenen Spieler** siehst du deine erfolgreichen Spielerwerbungen privat."
       ].join("\n")
     )
-    .setFooter({ text: "Invite Panel | Blacklist" });
+    .setFooter({ text: "Spieler werben Spieler | Blacklist" });
   if (env.PANEL_THUMBNAIL_URL) embed.setThumbnail(env.PANEL_THUMBNAIL_URL);
 
   return {
     embeds: [embed],
     components: [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Invite-Link").setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine Einladungen").setStyle(ButtonStyle.Primary)
+        new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine geworbenen Spieler").setStyle(ButtonStyle.Primary)
       )
     ]
   };
@@ -57,11 +57,11 @@ export function referralsPage(
           return `**${position}.** ${name} - <t:${Math.floor(referral.joinedAt.getTime() / 1000)}:d>`;
         })
         .join("\n")
-    : "Du hast aktuell keine qualifizierten Einladungen.";
+    : "Du hast aktuell keine erfolgreichen Spielerwerbungen.";
 
   const embed = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle("Meine Einladungen")
+    .setTitle("Meine geworbenen Spieler")
     .setDescription(description)
     .setFooter({ text: `Gesamt: ${referrals.length} | Seite ${safePage + 1}/${lastPage + 1}` });
   const components = lastPage > 0
@@ -78,15 +78,15 @@ export function referralsPage(
 export function rankingEmbed(rows: Array<{ member: GuildMember; total: number }>, scope: RankingScope): EmbedBuilder {
   const scopeLabel = scope === "monthly" ? "Monatlich" : "Gesamt";
   const footer = scope === "monthly"
-    ? "Nur aktive Linked-Referrals des aktuellen Monats werden gezaehlt."
-    : "Nur aktive Linked-Referrals der gesamten Laufzeit werden gezaehlt.";
+    ? "Nur erfolgreiche Spielerwerbungen des aktuellen Monats werden gezaehlt."
+    : "Nur erfolgreiche Spielerwerbungen der gesamten Laufzeit werden gezaehlt.";
   return new EmbedBuilder()
     .setColor(0xd4af37)
-    .setTitle(`Blacklist Invite-System | ${scopeLabel} | Top ${env.RANKING_DISPLAY_LIMIT}`)
+    .setTitle(`Blacklist Spieler werben Spieler System | ${scopeLabel} | Top ${env.RANKING_DISPLAY_LIMIT}`)
     .setDescription(
       rows.length
         ? rows.map((row, index) => `**${index + 1}.** ${row.member.displayName} - **${row.total}**`).join("\n")
-        : "Es gibt aktuell keine qualifizierten Einladungen."
+        : "Es gibt aktuell keine erfolgreichen Spielerwerbungen."
     )
     .setFooter({ text: footer })
     .setTimestamp();

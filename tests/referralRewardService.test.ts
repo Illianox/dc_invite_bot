@@ -51,7 +51,9 @@ async function qualifiedReferral(): Promise<{ repository: MemoryRepository; stat
   const referralId = await repository.resolveQueuedJoin(queueId, {
     guildId: "guild",
     inviterId: "inviter",
+    inviterName: "Inviter#0001",
     inviteeId: "invited",
+    inviteeName: "Invited#0001",
     inviteCode: "code",
     joinedAt: new Date(),
     status: "pending",
@@ -70,7 +72,9 @@ async function addQualifiedReferral(repository: MemoryRepository, inviteeId: str
   const referralId = await repository.resolveQueuedJoin(queueId, {
     guildId: "guild",
     inviterId,
+    inviterName: `${inviterId}#0001`,
     inviteeId,
+    inviteeName: `${inviteeId}#0001`,
     inviteCode: `code-${inviteeId}`,
     joinedAt: new Date(),
     status: "pending",
@@ -166,7 +170,7 @@ describe("ReferralRewardService", () => {
   it("remembers EOS identities locally even if the external link later disappears", async () => {
     const repository = new MemoryRepository();
     repository.setRewardSteps(defaultRewardSteps);
-    await repository.rememberPlayerIdentity("guild", "old-discord", "EOS_RETURNING");
+    await repository.rememberPlayerIdentity("guild", "old-discord", "Old Discord#0001", "EOS_RETURNING");
     await addQualifiedReferral(repository, "new-discord", "inviter");
     const stats = new MemoryPlayerStatsRepository();
     stats.setLink("inviter", "EOS_INVITER");

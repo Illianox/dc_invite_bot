@@ -48,7 +48,7 @@ client.once("ready", async () => {
     timers.push(setInterval(() => void invites.establishBaseline(guild, "recovery").catch((error) => repository.logError("invite_sync_error", String(error))), env.INVITE_RECHECK_INTERVAL_MS));
     timers.push(setInterval(() => void logs.dispatch().catch((error) => repository.logError("log_dispatch_error", String(error))), env.LOG_DISPATCH_INTERVAL_MS));
     timers.push(setInterval(() => void repository.deleteExpiredHistory(env.HISTORY_RETENTION_DAYS).catch((error) => repository.logError("cleanup_error", String(error))), env.CLEANUP_INTERVAL_MS));
-    console.log(`Blacklist Invite-System v0.1.0 ready as ${client.user?.tag} using ${env.DATA_MODE} storage.`);
+    console.log(`Blacklist Spieler werben Spieler System v0.1.0 ready as ${client.user?.tag} using ${env.DATA_MODE} storage.`);
   } catch (error) {
     console.error("Startup validation failed.", error);
     await repository.logError("startup_error", String(error)).catch(() => undefined);

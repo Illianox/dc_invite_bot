@@ -26,7 +26,9 @@ export interface Referral {
   id: number;
   guildId: string;
   inviterDiscordId: string | null;
+  inviterDiscordName: string | null;
   inviteeDiscordId: string;
+  inviteeDiscordName: string | null;
   inviteCode: string | null;
   joinedAt: Date;
   status: ReferralStatus;

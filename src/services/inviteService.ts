@@ -59,7 +59,7 @@ export class InviteService {
       maxAge: 0,
       maxUses: 0,
       unique: true,
-      reason: `Personal referral invite for ${inviter.user.tag}`
+      reason: `Persoenlicher Spieler werben Spieler Einladungslink fuer ${inviter.user.tag}`
     });
     try {
       await this.repository.createInvite(guild.id, inviter.id, invite.code, channel.id, invite.uses ?? 0);
@@ -95,19 +95,19 @@ export class InviteService {
   }
 
   private async processMemberJoin(member: GuildMember): Promise<void> {
-    const displayName = member.displayName && member.displayName !== member.user.username
-      ? `${member.displayName} (${member.user.tag})`
-      : member.user.tag;
+    const displayName = memberDisplayName(member);
     const queueId = await this.repository.enqueueJoin(member.guild.id, member.id, displayName, member.joinedAt ?? new Date());
     if (member.user.bot) {
       await this.repository.resolveQueuedJoin(queueId, {
         guildId: member.guild.id,
         inviterId: null,
+        inviterName: null,
         inviteeId: member.id,
+        inviteeName: displayName,
         inviteCode: null,
         joinedAt: member.joinedAt ?? new Date(),
         status: "non_referral",
-        reason: "Bot-Accounts koennen keine Referrals sein."
+        reason: "Bot-Accounts koennen keine Spielerwerbungen sein."
       }, this.snapshots);
       return;
     }
@@ -118,7 +118,9 @@ export class InviteService {
       await this.repository.resolveQueuedJoin(queueId, {
         guildId: member.guild.id,
         inviterId: null,
+        inviterName: null,
         inviteeId: member.id,
+        inviteeName: displayName,
         inviteCode: null,
         joinedAt: member.joinedAt ?? new Date(),
         status: "unresolved",
@@ -139,6 +141,7 @@ export class InviteService {
         const resolution = resolveInviteChange(this.snapshots, currentUses, new Set(this.activeInvites.keys()));
         const inviteCode = resolution.kind === "pending" ? resolution.inviteCode : null;
         const managed = inviteCode ? this.activeInvites.get(inviteCode) : null;
+        const inviterName = managed ? await this.findMemberName(member.guild, managed.inviterDiscordId) : null;
         const resolvedSnapshots = resolution.kind === "pending" ? resolution.consumedUses : currentUses;
 
         if (resolution.kind === "pending" && resolution.delta > 1 && attempt === 0) {
@@ -148,7 +151,7 @@ export class InviteService {
           continue;
         }
 
-        if (resolution.kind === "unresolved" && resolution.reason.startsWith("Kein verwalteter Invite-Link") && attempt < backoff.length) {
+        if (resolution.kind === "unresolved" && resolution.reason.startsWith("Kein verwalteter Einladungslink") && attempt < backoff.length) {
           const retryAt = new Date(Date.now() + backoff[attempt]!);
           await this.repository.setQueueAttempt(queueId, attempt + 1, retryAt, "Invite-Nutzungsstand noch unveraendert, erneute Pruefung folgt.");
           await delay(backoff[attempt]!);
@@ -159,7 +162,9 @@ export class InviteService {
           await this.repository.resolveQueuedJoin(queueId, {
             guildId: member.guild.id,
             inviterId: null,
+            inviterName: null,
             inviteeId: member.id,
+            inviteeName: displayName,
             inviteCode,
             joinedAt: member.joinedAt ?? new Date(),
             status: "non_referral",
@@ -171,11 +176,13 @@ export class InviteService {
           await this.repository.resolveQueuedJoin(queueId, {
             guildId: member.guild.id,
             inviterId: managed?.inviterDiscordId ?? null,
+            inviterName,
             inviteeId: member.id,
+            inviteeName: displayName,
             inviteCode,
             joinedAt: member.joinedAt ?? new Date(),
             status: resolution.kind,
-            reason: resolution.kind === "pending" ? "Eindeutige Nutzung eines verwalteten Invite-Links erkannt." : resolution.kind === "non_referral" ? "Keine Nutzung eines verwalteten Invite-Links erkannt." : resolution.reason
+            reason: resolution.kind === "pending" ? "Eindeutige Nutzung eines verwalteten Einladungslinks erkannt." : resolution.kind === "non_referral" ? "Keine Nutzung eines verwalteten Einladungslinks erkannt." : resolution.reason
           }, resolvedSnapshots);
         }
         this.snapshots = resolvedSnapshots;
@@ -187,7 +194,9 @@ export class InviteService {
           await this.repository.resolveQueuedJoin(queueId, {
             guildId: member.guild.id,
             inviterId: null,
+            inviterName: null,
             inviteeId: member.id,
+            inviteeName: displayName,
             inviteCode: null,
             joinedAt: member.joinedAt ?? new Date(),
             status: "unresolved",
@@ -206,6 +215,11 @@ export class InviteService {
     return new Map(Array.from(invites, (invite) => [invite.code, invite.uses ?? 0]));
   }
 
+  private async findMemberName(guild: Guild, memberId: string): Promise<string | null> {
+    const member = await guild.members.fetch(memberId).catch(() => null);
+    return member ? memberDisplayName(member) : null;
+  }
+
   private async sendWelcomeMessage(member: GuildMember, inviterId: string): Promise<void> {
     if (!env.WELCOME_MESSAGE_ENABLED) return;
     const channel = await member.guild.channels.fetch(env.WELCOME_CHANNEL_ID).catch(() => null);
@@ -222,4 +236,10 @@ export class InviteService {
       ].join("\n")
     }).catch((error: unknown) => this.repository.logError("welcome_message_error", String(error)));
   }
+}
+
+function memberDisplayName(member: GuildMember): string {
+  return member.displayName && member.displayName !== member.user.username
+    ? `${member.displayName} (${member.user.tag})`
+    : member.user.tag;
 }

@@ -14,8 +14,9 @@ function member(guild: unknown, id: string): any {
   return {
     id,
     guild,
+    displayName: id,
     joinedAt: new Date(),
-    user: { bot: false }
+    user: { bot: false, username: id, tag: `${id}#0001` }
   };
 }
 
@@ -28,6 +29,9 @@ describe("InviteService", () => {
       id: "guild",
       invites: {
         fetch: async () => inviteMap(3)
+      },
+      members: {
+        fetch: async (id: string) => member(guild, id)
       },
       channels: {
         fetch: async () => null
@@ -65,6 +69,9 @@ describe("InviteService", () => {
       id: "guild",
       invites: {
         fetch: async () => fetches.shift() ?? invites({ abc: 2, def: 1 })
+      },
+      members: {
+        fetch: async (id: string) => member(guild, id)
       },
       channels: {
         fetch: async () => null

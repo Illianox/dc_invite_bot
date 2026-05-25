@@ -25,7 +25,7 @@ export function resolveInviteChange(
 
   if (managedChanges.length === 0) {
     return managedCodes.size > 0
-      ? { kind: "unresolved", reason: "Kein verwalteter Invite-Link ist gestiegen, obwohl verwaltete Links vorhanden sind." }
+      ? { kind: "unresolved", reason: "Kein verwalteter Einladungslink ist gestiegen, obwohl verwaltete Links vorhanden sind." }
       : { kind: "non_referral" };
   }
   if (managedChanges.length === 1) {

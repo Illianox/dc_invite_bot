@@ -67,7 +67,7 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
       : null;
     const published = message ? await message.edit(mainPanel()) : await channel.send(mainPanel());
     await deps.repository.savePanelMessage("main_panel", interaction.guildId, channel.id, published.id);
-    await interaction.reply({ content: "Das Invite-Panel wurde veroeffentlicht oder aktualisiert.", flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: "Das Spieler werben Spieler Panel wurde veroeffentlicht oder aktualisiert.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -91,20 +91,20 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
     const subcommand = interaction.options.getSubcommand();
     if (subcommand === "list") {
       const rows = await deps.repository.listRewardReferrals(interaction.guildId);
-      const lines = rows.slice(0, 20).map((row) => `#${row.id} ${row.rewardStatus} - Inviter ${row.inviterDiscordId ? `<@${row.inviterDiscordId}>` : "unbekannt"} / Invited <@${row.inviteeDiscordId}> / Start ${row.startMinutes ?? "offen"}`);
-      await interaction.reply({ content: lines.length ? lines.join("\n") : "Keine offenen oder aktiven Reward-Referrals gefunden.", flags: MessageFlags.Ephemeral });
+      const lines = rows.slice(0, 20).map((row) => `#${row.id} ${row.rewardStatus} - Geworben von ${row.inviterDiscordId ? `<@${row.inviterDiscordId}>` : "unbekannt"} / Geworbener Spieler <@${row.inviteeDiscordId}> / Start ${row.startMinutes ?? "offen"}`);
+      await interaction.reply({ content: lines.length ? lines.join("\n") : "Keine offenen oder aktiven Spielerwerbungen gefunden.", flags: MessageFlags.Ephemeral });
       return;
     }
     if (subcommand === "forcecheck") {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const result = await deps.rewards.checkAll(interaction.guildId);
-      await interaction.editReply(`Reward-Pruefung abgeschlossen. Geprueft: ${result.checked}, ausgezahlte Etappen: ${result.paid}.`);
+      await interaction.editReply(`Spielerwerbungs-Pruefung abgeschlossen. Geprueft: ${result.checked}, verarbeitete Etappen: ${result.paid}.`);
       return;
     }
     if (subcommand === "reload") {
       const config = await deps.rewards.reloadConfig();
       const steps = await deps.repository.listRewardSteps();
-      await interaction.reply({ content: `Reward-Config neu geladen. dryRun=${config.dryRun}, multiServerRewards=${config.multiServerRewards}, aktive DB-Etappen=${steps.length}.`, flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: `Spielerwerbungs-Config neu geladen. dryRun=${config.dryRun}, mehrereServer=${config.multiServerRewards}, aktive DB-Etappen=${steps.length}.`, flags: MessageFlags.Ephemeral });
       return;
     }
     const target = interaction.options.getUser("member", true);
@@ -115,12 +115,12 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
     if (subcommand === "block") {
       const reason = interaction.options.getString("grund", true);
       const blocked = await deps.rewards.block(interaction.guildId, target.id, reason, interaction.user.id);
-      await interaction.reply({ content: blocked ? "Reward-Referral wurde blockiert." : "Keine Referral-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: blocked ? "Spielerwerbung wurde blockiert." : "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
       return;
     }
     if (subcommand === "unblock") {
       const unblocked = await deps.rewards.unblock(interaction.guildId, target.id, interaction.user.id);
-      await interaction.reply({ content: unblocked ? "Reward-Referral wurde entsperrt." : "Keine Referral-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: unblocked ? "Spielerwerbung wurde entsperrt." : "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
       return;
     }
     if (subcommand === "forcereward") {
@@ -132,7 +132,7 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
     if (subcommand === "inspect") {
       const history = await deps.repository.listReferralHistory(interaction.guildId, target.id);
       const lines = history.map((row) => `#${row.id} ${row.status} - <t:${Math.floor(row.joinedAt.getTime() / 1000)}:f>`).join("\n");
-      await interaction.reply({ content: lines || "Keine Referral-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: lines || "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.", flags: MessageFlags.Ephemeral });
       return;
     }
     if (subcommand === "assign") {
@@ -147,27 +147,27 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
         return;
       }
       if (await deps.repository.findCurrentReferral(interaction.guildId, target.id)) {
-        await interaction.reply({ content: "Dieses Mitglied hat bereits eine laufende Referral-Zuordnung.", flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: "Dieses Mitglied hat bereits eine laufende Spielerwerbung.", flags: MessageFlags.Ephemeral });
         return;
       }
       const unresolved = await deps.repository.findLatestAssignableReferral(interaction.guildId, target.id);
       if (!unresolved) {
-        await interaction.reply({ content: "Es gibt keinen `unresolved`- oder `non_referral`-Datensatz zur Zuordnung.", flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: "Es gibt keinen ungeklaerten Datensatz zur Zuordnung.", flags: MessageFlags.Ephemeral });
         return;
       }
       const status = deps.referrals.isQualified(member) ? "qualified" : "pending";
-      await deps.repository.assignReferral(unresolved, inviter.id, status, interaction.user.id, reason);
-      await interaction.reply({ content: `Referral wurde als \`${status}\` zugeordnet.`, flags: MessageFlags.Ephemeral });
+      await deps.repository.assignReferral(unresolved, inviter.id, memberDisplayName(inviterMember), memberDisplayName(member), status, interaction.user.id, reason);
+      await interaction.reply({ content: `Spielerwerbung wurde als \`${statusLabel(status)}\` zugeordnet.`, flags: MessageFlags.Ephemeral });
       return;
     }
     const reason = interaction.options.getString("reason", true);
     const active = await deps.repository.findCurrentReferral(interaction.guildId, target.id);
     if (!active) {
-      await interaction.reply({ content: "Keine laufende Referral-Zuordnung gefunden.", flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: "Keine laufende Spielerwerbung gefunden.", flags: MessageFlags.Ephemeral });
       return;
     }
     await deps.repository.transitionReferral(active, "revoked", "admin_revoke", interaction.user.id, reason);
-    await interaction.reply({ content: "Referral wurde widerrufen.", flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: "Spielerwerbung wurde widerrufen.", flags: MessageFlags.Ephemeral });
     return;
   }
 
@@ -189,7 +189,7 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
         `Speicher-Latenz: \`${latency}ms\``,
         `Letzte Migration: \`${migration ?? "keine"}\``,
         `Letzter erfolgreicher Sync: \`${lastSync?.toISOString() ?? "noch keiner"}\``,
-        `Letzter Invite-Snapshot: \`${latestSnapshot?.toISOString() ?? "noch keiner"}\``,
+        `Letzter Einladungs-Snapshot: \`${latestSnapshot?.toISOString() ?? "noch keiner"}\``,
         `Offene DB-Queue: \`${queueLength}\``,
         `Aktive lokale Join-Verarbeitung: \`${deps.invites.queueSize()}\``,
         `Letzter Fehler: \`${latestError ?? "keiner"}\``
@@ -201,6 +201,16 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
 
 function rankingPanelType(scope: RankingScope): PanelMessageType {
   return scope === "monthly" ? "public_ranking_monthly" : "public_ranking_all_time";
+}
+
+function statusLabel(status: "pending" | "qualified"): string {
+  return status === "qualified" ? "erfolgreich" : "wartend";
+}
+
+function memberDisplayName(member: GuildMember): string {
+  return member.displayName && member.displayName !== member.user.username
+    ? `${member.displayName} (${member.user.tag})`
+    : member.user.tag;
 }
 
 export async function handleButton(interaction: ButtonInteraction, deps: CommandDependencies): Promise<void> {
@@ -226,7 +236,7 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const url = await deps.invites.getOrCreatePersonalInvite(interaction.guild!, member);
-    await interaction.editReply(`Dein persoenlicher Invite-Link:\n${url}`);
+    await interaction.editReply(`Dein persoenlicher Einladungslink:\n${url}`);
     return;
   }
 
@@ -242,7 +252,7 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
       requestedPage = Number(page);
       expiresAt = Number(expiration);
       if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) {
-        await interaction.reply({ content: "Diese Seitennavigation ist abgelaufen. Oeffne `Meine Einladungen` erneut.", flags: MessageFlags.Ephemeral });
+        await interaction.reply({ content: "Diese Seitennavigation ist abgelaufen. Oeffne `Meine geworbenen Spieler` erneut.", flags: MessageFlags.Ephemeral });
         return;
       }
     } else {

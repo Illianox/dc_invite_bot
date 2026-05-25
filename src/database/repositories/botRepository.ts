@@ -16,7 +16,9 @@ interface ReferralRow extends RowDataPacket {
   id: number;
   guild_id: string;
   inviter_discord_id: string | null;
+  inviter_discord_name: string | null;
   invitee_discord_id: string;
+  invitee_discord_name: string | null;
   invite_code: string | null;
   joined_at: Date;
   status: ReferralStatus;
@@ -75,7 +77,9 @@ function mapReferral(row: ReferralRow): Referral {
     id: row.id,
     guildId: row.guild_id,
     inviterDiscordId: row.inviter_discord_id,
+    inviterDiscordName: row.inviter_discord_name,
     inviteeDiscordId: row.invitee_discord_id,
+    inviteeDiscordName: row.invitee_discord_name,
     inviteCode: row.invite_code,
     joinedAt: row.joined_at,
     status: row.status,
@@ -141,7 +145,7 @@ export class BotRepository implements Repository {
         [guildId, inviterId, inviteCode, channelId]
       );
       await this.upsertSnapshot(connection, inviteCode, knownUses, "invite_created");
-      await this.insertLog(connection, "info", "invite_created", inviterId, null, `Invite ${this.shortCode(inviteCode)} wurde von ${this.mention(inviterId)} erstellt.`);
+      await this.insertLog(connection, "info", "invite_created", inviterId, null, `Einladungslink ${this.shortCode(inviteCode)} wurde von ${this.mention(inviterId)} erstellt.`);
     });
   }
 
@@ -151,7 +155,7 @@ export class BotRepository implements Repository {
         "UPDATE user_invites SET status = 'deleted', deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'active'",
         [invite.id]
       );
-      await this.insertLog(connection, "warn", "invite_deleted", invite.inviterDiscordId, null, `Invite ${this.shortCode(invite.inviteCode)} von ${this.mention(invite.inviterDiscordId)} existiert nicht mehr.`);
+      await this.insertLog(connection, "warn", "invite_deleted", invite.inviterDiscordId, null, `Einladungslink ${this.shortCode(invite.inviteCode)} von ${this.mention(invite.inviterDiscordId)} existiert nicht mehr.`);
     });
   }
 
@@ -183,15 +187,15 @@ export class BotRepository implements Repository {
 
   public async recoverOpenJoins(guildId: string): Promise<number> {
     return this.inTransaction(async (connection) => {
-      const [rows] = await connection.query<Array<RowDataPacket & { id: number; invitee_discord_id: string; joined_at: Date }>>(
-        "SELECT id, invitee_discord_id, joined_at FROM join_processing_queue WHERE guild_id = ? AND status IN ('queued', 'processing') FOR UPDATE",
+      const [rows] = await connection.query<Array<RowDataPacket & { id: number; invitee_discord_id: string; invitee_discord_name: string | null; joined_at: Date }>>(
+        "SELECT id, invitee_discord_id, invitee_discord_name, joined_at FROM join_processing_queue WHERE guild_id = ? AND status IN ('queued', 'processing') FOR UPDATE",
         [guildId]
       );
       for (const row of rows) {
         const [result] = await connection.query<ResultSetHeader>(
-          `INSERT INTO referrals (guild_id, invitee_discord_id, joined_at, status)
-           VALUES (?, ?, ?, 'unresolved')`,
-          [guildId, row.invitee_discord_id, row.joined_at]
+          `INSERT INTO referrals (guild_id, invitee_discord_id, invitee_discord_name, joined_at, status)
+           VALUES (?, ?, ?, ?, 'unresolved')`,
+          [guildId, row.invitee_discord_id, row.invitee_discord_name, row.joined_at]
         );
         await connection.query(
           `INSERT INTO referral_events (referral_id, event_type, new_status, reason)
@@ -217,7 +221,9 @@ export class BotRepository implements Repository {
     data: {
       guildId: string;
       inviterId: string | null;
+      inviterName: string | null;
       inviteeId: string;
+      inviteeName: string | null;
       inviteCode: string | null;
       joinedAt: Date;
       status: ReferralStatus;
@@ -228,9 +234,9 @@ export class BotRepository implements Repository {
     return this.inTransaction(async (connection) => {
       const [result] = await connection.query<ResultSetHeader>(
         `INSERT INTO referrals
-          (guild_id, inviter_discord_id, invitee_discord_id, invite_code, joined_at, status)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [data.guildId, data.inviterId, data.inviteeId, data.inviteCode, data.joinedAt, data.status]
+          (guild_id, inviter_discord_id, inviter_discord_name, invitee_discord_id, invitee_discord_name, invite_code, joined_at, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [data.guildId, data.inviterId, data.inviterName, data.inviteeId, data.inviteeName, data.inviteCode, data.joinedAt, data.status]
       );
       const referralId = result.insertId;
       await connection.query(
@@ -283,7 +289,7 @@ export class BotRepository implements Repository {
          WHERE id = ? AND status = ?`,
         [nextStatus, nextStatus, nextStatus, actorId, actorId, reason, referral.id, referral.status]
       );
-      if (update.affectedRows !== 1) throw new Error("Referral changed before the requested transition could be applied.");
+      if (update.affectedRows !== 1) throw new Error("Spielerwerbung wurde geaendert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
       await connection.query(
         `INSERT INTO referral_events
           (referral_id, event_type, old_status, new_status, actor_discord_id, reason)
@@ -294,15 +300,16 @@ export class BotRepository implements Repository {
     });
   }
 
-  public async assignReferral(referral: Referral, inviterId: string, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void> {
+  public async assignReferral(referral: Referral, inviterId: string, inviterName: string | null, inviteeName: string | null, nextStatus: "pending" | "qualified", adminId: string, reason: string): Promise<void> {
     await this.inTransaction(async (connection) => {
       const [update] = await connection.query<ResultSetHeader>(
-        `UPDATE referrals SET inviter_discord_id = ?, status = ?, resolved_by_admin_id = ?, resolution_reason = ?,
+        `UPDATE referrals SET inviter_discord_id = ?, inviter_discord_name = ?, invitee_discord_name = COALESCE(?, invitee_discord_name),
+         status = ?, resolved_by_admin_id = ?, resolution_reason = ?,
          qualified_at = CASE WHEN ? = 'qualified' THEN CURRENT_TIMESTAMP ELSE NULL END
          WHERE id = ? AND status IN ('unresolved', 'non_referral')`,
-        [inviterId, nextStatus, adminId, reason, nextStatus, referral.id]
+        [inviterId, inviterName, inviteeName, nextStatus, adminId, reason, nextStatus, referral.id]
       );
-      if (update.affectedRows !== 1) throw new Error("Referral is no longer assignable.");
+      if (update.affectedRows !== 1) throw new Error("Spielerwerbung kann nicht mehr zugeordnet werden.");
       await connection.query(
         `INSERT INTO referral_events
           (referral_id, event_type, old_status, new_status, actor_discord_id, reason)
@@ -413,12 +420,13 @@ export class BotRepository implements Repository {
     return (rows[0]?.total ?? 0) > 0;
   }
 
-  public async rememberPlayerIdentity(guildId: string, discordId: string, eosId: string): Promise<void> {
+  public async rememberPlayerIdentity(guildId: string, discordId: string, discordName: string | null, eosId: string): Promise<void> {
     await this.pool.query(
-      `INSERT INTO referral_player_identities (guild_id, discord_id, eos_id)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE eos_id = VALUES(eos_id), last_seen_at = CURRENT_TIMESTAMP`,
-      [guildId, discordId, eosId]
+      `INSERT INTO referral_player_identities (guild_id, discord_id, discord_name, eos_id)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE discord_name = COALESCE(VALUES(discord_name), discord_name),
+         eos_id = VALUES(eos_id), last_seen_at = CURRENT_TIMESTAMP`,
+      [guildId, discordId, discordName, eosId]
     );
   }
 
@@ -443,8 +451,14 @@ export class BotRepository implements Repository {
 
   public async activateRewardReferral(referralId: number, inviterEosId: string, invitedEosId: string, startMinutes: number): Promise<boolean> {
     return this.inTransaction(async (connection) => {
-      const [existing] = await connection.query<Array<RowDataPacket & { guild_id: string; invitee_discord_id: string }>>(
-        "SELECT guild_id, invitee_discord_id FROM referrals WHERE id = ? FOR UPDATE",
+      const [existing] = await connection.query<Array<RowDataPacket & {
+        guild_id: string;
+        inviter_discord_id: string | null;
+        inviter_discord_name: string | null;
+        invitee_discord_id: string;
+        invitee_discord_name: string | null;
+      }>>(
+        "SELECT guild_id, inviter_discord_id, inviter_discord_name, invitee_discord_id, invitee_discord_name FROM referrals WHERE id = ? FOR UPDATE",
         [referralId]
       );
       const referral = existing[0];
@@ -470,7 +484,19 @@ export class BotRepository implements Repository {
         [inviterEosId, invitedEosId, startMinutes, referralId]
       );
       if (update.affectedRows === 1) {
-        await this.insertLog(connection, "info", "referral_reward_active", referral.invitee_discord_id, referralId, `Referral #${referralId} wurde fuer Rewards aktiviert. Start-Minuten: ${startMinutes}.`);
+        await this.insertLog(connection, "info", "referral_reward_active", referral.invitee_discord_id, referralId, [
+          "Eingeladener Spieler:",
+          this.displayUser(referral.invitee_discord_id, referral.invitee_discord_name),
+          "",
+          "Eingeladen von:",
+          referral.inviter_discord_id ? this.displayUser(referral.inviter_discord_id, referral.inviter_discord_name) : "unbekannt",
+          "",
+          "Start-Spielzeit:",
+          this.formatMinutes(startMinutes),
+          "",
+          "Status:",
+          "Spieler wurde erfolgreich zugeordnet."
+        ].join("\n"));
       }
       return update.affectedRows === 1;
     });
@@ -487,7 +513,7 @@ export class BotRepository implements Repository {
     await this.inTransaction(async (connection) => {
       await connection.query("UPDATE referrals SET reward_status = 'blocked', blocked_reason = ? WHERE id = ?", [reason, referralId]);
       await connection.query("UPDATE referral_step_progress SET status = 'blocked' WHERE referral_id = ? AND status <> 'paid'", [referralId]);
-      await this.insertLog(connection, "warn", "referral_reward_blocked", actorId, referralId, `Referral #${referralId} wurde blockiert.\nGrund: ${reason}`);
+      await this.insertLog(connection, "warn", "referral_reward_blocked", actorId, referralId, `Spielerwerbung #${referralId} wurde blockiert.\nGrund: ${reason}`);
     });
   }
 
@@ -495,7 +521,7 @@ export class BotRepository implements Repository {
     await this.inTransaction(async (connection) => {
       await connection.query("UPDATE referrals SET reward_status = CASE WHEN start_minutes IS NULL THEN 'pending' ELSE 'active' END, blocked_reason = NULL WHERE id = ? AND reward_status = 'blocked'", [referralId]);
       await connection.query("UPDATE referral_step_progress SET status = 'pending' WHERE referral_id = ? AND status = 'blocked'", [referralId]);
-      await this.insertLog(connection, "info", "referral_reward_unblocked", actorId, referralId, `Referral #${referralId} wurde entsperrt.`);
+      await this.insertLog(connection, "info", "referral_reward_unblocked", actorId, referralId, `Spielerwerbung #${referralId} wurde entsperrt.`);
     });
   }
 
@@ -582,7 +608,9 @@ export class BotRepository implements Repository {
     await this.pool.query(
       `UPDATE referrals
        SET inviter_discord_id = NULL,
+           inviter_discord_name = NULL,
            invitee_discord_id = CONCAT('anon-', id),
+           invitee_discord_name = NULL,
            invite_code = NULL,
            resolved_by_admin_id = NULL,
            resolution_reason = NULL
@@ -723,15 +751,25 @@ export class BotRepository implements Repository {
 
   private referralLogDetails(inviteeId: string, inviterId: string | null, status: ReferralStatus, reason: string): string {
     const statusLine = status === "pending"
-      ? "Status: Wartet auf Verifizierung"
+      ? "Status:\nSpielerwerbung wartet auf Verifizierung."
       : status === "qualified"
-        ? "Status: Erfolgreich verifiziert, Einladung wird jetzt gezaehlt"
-        : `Grund: ${reason}`;
+        ? "Status:\nSpielerwerbung erfolgreich."
+        : `Grund:\n${reason}`;
     return [
-      `Eingeladenes Mitglied: ${this.mention(inviteeId)}`,
-      `Eingeladen von: ${inviterId ? this.mention(inviterId) : "unbekannt"}`,
+      `Eingeladener Spieler:\n${this.mention(inviteeId)}`,
+      `Eingeladen von:\n${inviterId ? this.mention(inviterId) : "unbekannt"}`,
       statusLine
     ].join("\n");
+  }
+
+  private displayUser(userId: string, userName: string | null): string {
+    return userName ? `${userName} (${this.mention(userId)})` : this.mention(userId);
+  }
+
+  private formatMinutes(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return `${hours} Stunden ${remaining} Minuten`;
   }
 
   private mention(userId: string): string {
