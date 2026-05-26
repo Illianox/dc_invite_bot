@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+referralRewards.json
 coverage/
 *.log
 .DS_Store
