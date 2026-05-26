@@ -46,6 +46,12 @@
           "target": "invited",
           "mode": "global",
           "commands": ["addpoints {eos_id} 5000"]
+        },
+        {
+          "key": "10h_item_invited",
+          "target": "invited",
+          "mode": "online_server",
+          "commands": ["giveitem {eos_id} starterkit"]
         }
       ]
     }
