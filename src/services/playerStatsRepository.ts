@@ -1,9 +1,16 @@
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { env } from "../config/env.js";
+import type { OnlinePlayersConfig } from "../config/referralRewards.js";
+
+export interface OnlinePlayerLocation {
+  mapName: string;
+  serverId: string;
+}
 
 export interface PlayerStatsReader {
   findEosId(discordId: string): Promise<string | null>;
   getMinutesPlayed(eosId: string): Promise<number | null>;
+  findOnlineLocation(eosId: string, config: OnlinePlayersConfig): Promise<OnlinePlayerLocation | null>;
 }
 
 export class MySqlPlayerStatsRepository implements PlayerStatsReader {
@@ -33,11 +40,25 @@ export class MySqlPlayerStatsRepository implements PlayerStatsReader {
     const value = rows[0]?.minutes_played;
     return Number.isFinite(value) ? Number(value) : null;
   }
+
+  public async findOnlineLocation(eosId: string, config: OnlinePlayersConfig): Promise<OnlinePlayerLocation | null> {
+    const table = sqlTableIdentifier(config.database, config.table);
+    const eosColumn = sqlIdentifier(config.eosIdColumn);
+    const serverIdColumn = sqlIdentifier(config.serverIdColumn);
+    const mapNameColumn = sqlIdentifier(config.mapNameColumn);
+    const [rows] = await this.pool.query<Array<RowDataPacket & { server_id: string | number; map_name: string }>>(
+      `SELECT ${serverIdColumn} AS server_id, ${mapNameColumn} AS map_name FROM ${table} WHERE ${eosColumn} = ? LIMIT 1`,
+      [eosId]
+    );
+    const row = rows[0];
+    return row ? { serverId: String(row.server_id), mapName: row.map_name } : null;
+  }
 }
 
 export class MemoryPlayerStatsRepository implements PlayerStatsReader {
   private readonly links = new Map<string, string>();
   private readonly minutes = new Map<string, number>();
+  private readonly locations = new Map<string, OnlinePlayerLocation>();
 
   public setLink(discordId: string, eosId: string): void {
     this.links.set(discordId, eosId);
@@ -47,12 +68,21 @@ export class MemoryPlayerStatsRepository implements PlayerStatsReader {
     this.minutes.set(eosId, minutes);
   }
 
+  public setOnlineLocation(eosId: string, location: OnlinePlayerLocation | null): void {
+    if (location) this.locations.set(eosId, location);
+    else this.locations.delete(eosId);
+  }
+
   public async findEosId(discordId: string): Promise<string | null> {
     return this.links.get(discordId) ?? null;
   }
 
   public async getMinutesPlayed(eosId: string): Promise<number | null> {
     return this.minutes.get(eosId) ?? null;
+  }
+
+  public async findOnlineLocation(eosId: string, _config: OnlinePlayersConfig): Promise<OnlinePlayerLocation | null> {
+    return this.locations.get(eosId) ?? null;
   }
 }
 

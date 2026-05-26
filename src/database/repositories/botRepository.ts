@@ -378,8 +378,20 @@ export class BotRepository implements Repository {
     return rows.map((row) => ({
       key: row.step_key,
       requiredMinutes: row.required_minutes,
-      inviterCommands: parseCommandList(row.inviter_commands),
-      invitedCommands: parseCommandList(row.invited_commands),
+      rewards: [
+        {
+          key: `${row.step_key}_points_inviter`,
+          targetType: "inviter",
+          deliveryMode: "global",
+          commands: parseCommandList(row.inviter_commands)
+        },
+        {
+          key: `${row.step_key}_points_invited`,
+          targetType: "invited",
+          deliveryMode: "global",
+          commands: parseCommandList(row.invited_commands)
+        }
+      ],
       enabled: row.enabled === true || row.enabled === 1
     }));
   }
@@ -495,7 +507,7 @@ export class BotRepository implements Repository {
           this.formatMinutes(startMinutes),
           "",
           "Status:",
-          "Spieler wurde erfolgreich zugeordnet."
+          "Spielerwerbung ist aktiv."
         ].join("\n"));
       }
       return update.affectedRows === 1;

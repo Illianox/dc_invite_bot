@@ -11,6 +11,7 @@ export type RewardReferralStatus = "pending" | "active" | "completed" | "blocked
 export type ReferralStepStatus = "pending" | "retry" | "paid" | "failed" | "blocked";
 export type RewardLogStatus = "dry_run" | "success" | "failed";
 export type RewardTargetType = "inviter" | "invited";
+export type RewardDeliveryMode = "global" | "online_server";
 
 export interface UserInvite {
   id: number;
@@ -74,7 +75,13 @@ export interface ReferralRewardLog {
 export interface ReferralRewardStep {
   key: string;
   requiredMinutes: number;
-  inviterCommands: string[];
-  invitedCommands: string[];
+  rewards: ReferralRewardDefinition[];
   enabled: boolean;
+}
+
+export interface ReferralRewardDefinition {
+  key: string;
+  targetType: RewardTargetType;
+  deliveryMode: RewardDeliveryMode;
+  commands: string[];
 }

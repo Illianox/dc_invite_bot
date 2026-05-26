@@ -11,5 +11,43 @@
     "port": 27020,
     "password": ""
   },
-  "clusterServers": []
+  "clusterServers": [
+    {
+      "name": "Astra",
+      "serverId": "25,306,578",
+      "host": "127.0.0.1",
+      "port": 27020,
+      "password": ""
+    }
+  ],
+  "onlinePlayers": {
+    "database": "blacklistlogin",
+    "table": "lethallogin_logged_in_players",
+    "eosIdColumn": "eos_id",
+    "serverIdColumn": "ServerId",
+    "mapNameColumn": "MapName"
+  },
+  "onlineCheckCommand": "ListPlayers",
+  "onlineCheckResponseIncludes": "{eos_id}",
+  "rewards": [
+    {
+      "key": "10h",
+      "requiredMinutes": 600,
+      "enabled": true,
+      "rewards": [
+        {
+          "key": "10h_points_inviter",
+          "target": "inviter",
+          "mode": "global",
+          "commands": ["addpoints {eos_id} 10000"]
+        },
+        {
+          "key": "10h_points_invited",
+          "target": "invited",
+          "mode": "global",
+          "commands": ["addpoints {eos_id} 5000"]
+        }
+      ]
+    }
+  ]
 }

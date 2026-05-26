@@ -312,7 +312,7 @@ export class MemoryRepository implements Repository {
       this.formatMinutes(startMinutes),
       "",
       "Status:",
-      "Spieler wurde erfolgreich zugeordnet."
+      "Spielerwerbung ist aktiv."
     ].join("\n"));
     return true;
   }

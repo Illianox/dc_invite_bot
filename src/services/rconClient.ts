@@ -10,12 +10,20 @@ export interface RewardCommandResult {
 export class RconRewardClient {
   public async execute(server: RconServerConfig, command: string, dryRun: boolean): Promise<RewardCommandResult> {
     if (dryRun) return { serverName: server.name, command, status: "dry_run" };
+    await this.send(server, command);
+    return { serverName: server.name, command, status: "success" };
+  }
+
+  public async query(server: RconServerConfig, command: string): Promise<string> {
+    return this.send(server, command);
+  }
+
+  private async send(server: RconServerConfig, command: string): Promise<string> {
     const connection = new SourceRconConnection(server);
     await connection.connect();
     try {
       await connection.authenticate();
-      await connection.command(command);
-      return { serverName: server.name, command, status: "success" };
+      return await connection.command(command);
     } finally {
       connection.close();
     }

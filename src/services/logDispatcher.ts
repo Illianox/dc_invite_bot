@@ -10,6 +10,10 @@ export class LogDispatcher {
     if (!(channel instanceof TextChannel)) return;
 
     for (const log of await this.repository.pendingLogs()) {
+      if (!shouldSendToDiscord(log.event_type, log.severity)) {
+        await this.repository.markLogSent(log.id);
+        continue;
+      }
       try {
         await channel.send({
           embeds: [
@@ -28,6 +32,23 @@ export class LogDispatcher {
       }
     }
   }
+}
+
+function shouldSendToDiscord(eventType: string, severity: "info" | "warn" | "error"): boolean {
+  if (severity === "error") return true;
+  return new Set([
+    "admin_assign",
+    "admin_revoke",
+    "invite_deleted",
+    "join_startup_recovery",
+    "referral_unresolved",
+    "referral_reward_active",
+    "referral_reward_blocked",
+    "referral_reward_failed",
+    "referral_reward_progress_updated",
+    "referral_reward_retry",
+    "referral_reward_unblocked"
+  ]).has(eventType);
 }
 
 function logTitle(eventType: string): string {
@@ -56,6 +77,7 @@ function logTitle(eventType: string): string {
     referral_reward_dry_run: "Spielerwerbung Dry-Run",
     referral_reward_failed: "Spielerwerbung fehlgeschlagen",
     referral_reward_paid: "Spielerwerbung verarbeitet",
+    referral_reward_progress_updated: "Spielerwerbungs-Fortschritt aktualisiert",
     referral_reward_retry: "Spielerwerbung Retry",
     referral_reward_start_minutes_saved: "Start-Spielzeit gespeichert",
     referral_reward_step_reached: "Spielerwerbungs-Fortschritt",

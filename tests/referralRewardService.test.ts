@@ -18,6 +18,16 @@ function config(overrides: Partial<ReferralRewardsConfig> = {}): ReferralRewards
     multiServerRewards: false,
     rewardServer,
     clusterServers: [clusterServer],
+    onlinePlayers: {
+      database: "blacklistlogin",
+      table: "lethallogin_logged_in_players",
+      eosIdColumn: "eos_id",
+      serverIdColumn: "ServerId",
+      mapNameColumn: "MapName"
+    },
+    onlineCheckCommand: "ListPlayers",
+    onlineCheckResponseIncludes: "{eos_id}",
+    rewards: [],
     ...overrides
   };
 }
@@ -26,8 +36,20 @@ const defaultRewardSteps = [
   {
     key: "10h",
     requiredMinutes: 600,
-    inviterCommands: ["addpoints {eos_id} 10000"],
-    invitedCommands: ["addpoints {eos_id} 5000"],
+    rewards: [
+      {
+        key: "10h_points_inviter",
+        targetType: "inviter" as const,
+        deliveryMode: "global" as const,
+        commands: ["addpoints {eos_id} 10000"]
+      },
+      {
+        key: "10h_points_invited",
+        targetType: "invited" as const,
+        deliveryMode: "global" as const,
+        commands: ["addpoints {eos_id} 5000"]
+      }
+    ],
     enabled: true
   }
 ];
@@ -35,11 +57,16 @@ const defaultRewardSteps = [
 class RecordingRconClient extends RconRewardClient {
   public readonly calls: Array<{ server: string; command: string; dryRun: boolean }> = [];
   public fail = false;
+  public onlineResponse = "EOS_INVITER EOS_INVITED";
 
   public override async execute(server: RconServerConfig, command: string, dryRun: boolean): Promise<RewardCommandResult> {
     this.calls.push({ server: server.name, command, dryRun });
     if (this.fail) throw new Error("rcon down");
     return { serverName: server.name, command, status: dryRun ? "dry_run" : "success" };
+  }
+
+  public override async query(_server: RconServerConfig, _command: string): Promise<string> {
+    return this.onlineResponse;
   }
 }
 
@@ -95,7 +122,7 @@ describe("ReferralRewardService", () => {
     stats.setMinutes("EOS_INVITED", 799);
     expect(await service.checkAll("guild")).toEqual({ checked: 1, paid: 0 });
     stats.setMinutes("EOS_INVITED", 800);
-    expect(await service.checkAll("guild")).toEqual({ checked: 1, paid: 1 });
+    expect(await service.checkAll("guild")).toEqual({ checked: 1, paid: 2 });
 
     expect(rcon.calls).toEqual([
       { server: "reward", command: "addpoints EOS_INVITER 10000", dryRun: false },
@@ -123,6 +150,36 @@ describe("ReferralRewardService", () => {
     expect(secondRcon.calls.map((call) => call.server)).toEqual(["cluster-a", "cluster-a"]);
   });
 
+  it("pays online-server item rewards only on the confirmed current server", async () => {
+    const { repository, stats } = await qualifiedReferral();
+    const rcon = new RecordingRconClient();
+    stats.setOnlineLocation("EOS_INVITED", { mapName: "Astra", serverId: "25,306,578" });
+    const itemStep = [{
+      key: "10h",
+      requiredMinutes: 600,
+      enabled: true,
+      rewards: [{
+        key: "10h_item_invited",
+        target: "invited" as const,
+        mode: "online_server" as const,
+        commands: ["giveitem {eos_id} starterkit"]
+      }]
+    }];
+    const service = new ReferralRewardService(repository, stats, rcon, config({
+      dryRun: false,
+      clusterServers: [{ ...clusterServer, name: "Astra", serverId: "25,306,578" }],
+      rewards: itemStep
+    }));
+
+    await service.checkAll("guild");
+    stats.setMinutes("EOS_INVITED", 800);
+
+    expect(await service.checkAll("guild")).toEqual({ checked: 1, paid: 1 });
+    expect(rcon.calls).toEqual([
+      { server: "Astra", command: "giveitem EOS_INVITED starterkit", dryRun: false }
+    ]);
+  });
+
   it("retries failed RCON rewards before marking the step failed", async () => {
     const { repository, stats, referralId } = await qualifiedReferral();
     const rcon = new RecordingRconClient();
@@ -134,7 +191,8 @@ describe("ReferralRewardService", () => {
     await service.checkAll("guild");
     expect((await repository.listStepProgress(referralId))[0]?.status).toBe("retry");
 
-    await repository.resetStepForRetry(referralId, "10h");
+    await repository.resetStepForRetry(referralId, "10h_points_inviter");
+    await repository.resetStepForRetry(referralId, "10h_points_invited");
     await service.checkAll("guild");
     expect((await repository.listStepProgress(referralId))[0]?.status).toBe("failed");
   });
