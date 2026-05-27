@@ -147,6 +147,7 @@ export class ReferralRewardService {
     if (allPaid) {
       await this.repository.completeRewardReferral(currentReferral.id);
     }
+    if (activated) await this.logActivationSummary(currentReferral, rewardSteps);
     if (paid > 0 || allPaid) await this.logProgressSummary(currentReferral, paidRewardKeys, allPaid, rewardSteps);
     return paid;
   }
@@ -320,6 +321,26 @@ export class ReferralRewardService {
       "",
       "Verarbeitete Belohnungen:",
       paidRewards
+    ].join("\n"));
+  }
+
+  private async logActivationSummary(referral: Referral, rewardSteps: ReferralRewardStep[]): Promise<void> {
+    const nextStep = rewardSteps[0] ?? null;
+    await this.repository.logInfo("referral_reward_active", referral.inviteeDiscordId, referral.id, [
+      "Eingeladener Spieler:",
+      displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
+      "",
+      "Eingeladen von:",
+      referral.inviterDiscordId ? displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
+      "",
+      "Start-Spielzeit:",
+      formatOptionalMinutes(referral.startMinutes),
+      "",
+      "Naechste Belohnung:",
+      nextStep ? `${nextStep.key} (${formatShortMinutes(nextStep.requiredMinutes)})` : "keine",
+      "",
+      "Status:",
+      "Spielerwerbung ist aktiv."
     ].join("\n"));
   }
 

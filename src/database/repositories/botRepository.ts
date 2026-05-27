@@ -495,21 +495,6 @@ export class BotRepository implements Repository {
          WHERE id = ? AND reward_status = 'pending' AND status = 'qualified'`,
         [inviterEosId, invitedEosId, startMinutes, referralId]
       );
-      if (update.affectedRows === 1) {
-        await this.insertLog(connection, "info", "referral_reward_active", referral.invitee_discord_id, referralId, [
-          "Eingeladener Spieler:",
-          this.displayUser(referral.invitee_discord_id, referral.invitee_discord_name),
-          "",
-          "Eingeladen von:",
-          referral.inviter_discord_id ? this.displayUser(referral.inviter_discord_id, referral.inviter_discord_name) : "unbekannt",
-          "",
-          "Start-Spielzeit:",
-          this.formatMinutes(startMinutes),
-          "",
-          "Status:",
-          "Spielerwerbung ist aktiv."
-        ].join("\n"));
-      }
       return update.affectedRows === 1;
     });
   }

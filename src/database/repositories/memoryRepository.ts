@@ -301,19 +301,6 @@ export class MemoryRepository implements Repository {
     referral.startMinutes = startMinutes;
     referral.rewardStatus = "active";
     referral.blockedReason = null;
-    this.addLog("info", "referral_reward_active", [
-      "Eingeladener Spieler:",
-      this.displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
-      "",
-      "Eingeladen von:",
-      referral.inviterDiscordId ? this.displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
-      "",
-      "Start-Spielzeit:",
-      this.formatMinutes(startMinutes),
-      "",
-      "Status:",
-      "Spielerwerbung ist aktiv."
-    ].join("\n"));
     return true;
   }
 
