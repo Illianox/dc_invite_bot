@@ -59,7 +59,7 @@ export class InviteService {
       maxAge: 0,
       maxUses: 0,
       unique: true,
-      reason: `Persoenlicher Spieler werben Spieler Einladungslink fuer ${inviter.user.tag}`
+      reason: `Persönlicher Spieler werben Spieler Einladungslink für ${inviter.user.tag}`
     });
     try {
       await this.repository.createInvite(guild.id, inviter.id, invite.code, channel.id, invite.uses ?? 0);
@@ -107,7 +107,7 @@ export class InviteService {
         inviteCode: null,
         joinedAt: member.joinedAt ?? new Date(),
         status: "non_referral",
-        reason: "Bot-Accounts koennen keine Spielerwerbungen sein."
+        reason: "Bot-Accounts können keine Spielerwerbungen sein."
       }, this.snapshots);
       return;
     }
@@ -146,14 +146,14 @@ export class InviteService {
 
         if (resolution.kind === "pending" && resolution.delta > 1 && attempt === 0) {
           const retryAt = new Date(Date.now() + backoff[attempt]!);
-          await this.repository.setQueueAttempt(queueId, attempt + 1, retryAt, "Mehrere neue Invite-Nutzungen erkannt, kurze Gegenpruefung folgt.");
+          await this.repository.setQueueAttempt(queueId, attempt + 1, retryAt, "Mehrere neue Invite-Nutzungen erkannt, kurze Gegenprüfung folgt.");
           await delay(backoff[attempt]!);
           continue;
         }
 
         if (resolution.kind === "unresolved" && resolution.reason.startsWith("Kein verwalteter Einladungslink") && attempt < backoff.length) {
           const retryAt = new Date(Date.now() + backoff[attempt]!);
-          await this.repository.setQueueAttempt(queueId, attempt + 1, retryAt, "Invite-Nutzungsstand noch unveraendert, erneute Pruefung folgt.");
+          await this.repository.setQueueAttempt(queueId, attempt + 1, retryAt, "Invite-Nutzungsstand noch unverändert, erneute Prüfung folgt.");
           await delay(backoff[attempt]!);
           continue;
         }
@@ -232,7 +232,7 @@ export class InviteService {
         `Willkommen ${member} auf dem Server!`,
         "",
         `Du wurdest von <@${inviterId}> eingeladen.`,
-        `Danke an <@${inviterId}> fuers Einladen!`
+        `Danke an <@${inviterId}> fürs Einladen!`
       ].join("\n")
     }).catch((error: unknown) => this.repository.logError("welcome_message_error", String(error)));
   }

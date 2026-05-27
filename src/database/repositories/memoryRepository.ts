@@ -185,7 +185,7 @@ export class MemoryRepository implements Repository {
 
   public async transitionReferral(referral: Referral, nextStatus: ReferralStatus, eventType: string, actorId: string | null, reason: string): Promise<void> {
     const stored = this.referrals.find((entry) => entry.id === referral.id && entry.status === referral.status);
-    if (!stored) throw new Error("Spielerwerbung wurde geaendert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
+    if (!stored) throw new Error("Spielerwerbung wurde geändert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
     const oldStatus = stored.status;
     stored.status = nextStatus;
     if (nextStatus === "qualified" && !stored.qualifiedAt) stored.qualifiedAt = new Date();

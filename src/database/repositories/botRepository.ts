@@ -203,7 +203,7 @@ export class BotRepository implements Repository {
           [result.insertId]
         );
         await connection.query("UPDATE join_processing_queue SET status = 'failed', last_error = 'Nach Neustart wiederhergestellt.' WHERE id = ?", [row.id]);
-        await this.insertLog(connection, "warn", "join_startup_recovery", row.invitee_discord_id, result.insertId, `Offener Beitritt von ${this.mention(row.invitee_discord_id)} wurde nach einem Neustart als ungeklaert markiert.`);
+        await this.insertLog(connection, "warn", "join_startup_recovery", row.invitee_discord_id, result.insertId, `Offener Beitritt von ${this.mention(row.invitee_discord_id)} wurde nach einem Neustart als ungeklärt markiert.`);
       }
       return rows.length;
     });
@@ -289,7 +289,7 @@ export class BotRepository implements Repository {
          WHERE id = ? AND status = ?`,
         [nextStatus, nextStatus, nextStatus, actorId, actorId, reason, referral.id, referral.status]
       );
-      if (update.affectedRows !== 1) throw new Error("Spielerwerbung wurde geaendert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
+      if (update.affectedRows !== 1) throw new Error("Spielerwerbung wurde geändert, bevor der angeforderte Statuswechsel angewendet werden konnte.");
       await connection.query(
         `INSERT INTO referral_events
           (referral_id, event_type, old_status, new_status, actor_discord_id, reason)

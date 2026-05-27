@@ -22,7 +22,7 @@ export class ReferralService {
     if (!referral || referral.status === "pending" && !this.isQualified(member)) return "unchanged";
 
     if (this.isQualified(member) && referral.status !== "qualified") {
-      await this.repository.transitionReferral(referral, "qualified", "referral_qualified", null, "Mitglied ist verknuepft und das Screening ist abgeschlossen.");
+      await this.repository.transitionReferral(referral, "qualified", "referral_qualified", null, "Mitglied ist verknüpft und das Screening ist abgeschlossen.");
       return "qualified";
     }
     if (!this.isLinked(member) && referral.status === "qualified") {

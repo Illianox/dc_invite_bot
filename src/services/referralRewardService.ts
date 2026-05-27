@@ -59,7 +59,7 @@ export class ReferralRewardService {
   public async forceReward(guildId: string, inviteeId: string, stepKey: string): Promise<string> {
     const config = await this.currentConfig();
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
-    if (!referral) return "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.";
+    if (!referral) return "Keine Spielerwerbungs-Daten für dieses Mitglied gefunden.";
     const step = (await this.rewardSteps(config)).find((entry) => entry.key === stepKey);
     if (!step) return `Unbekannte Etappe: ${stepKey}`;
     await this.ensureActive(referral);
@@ -76,7 +76,7 @@ export class ReferralRewardService {
       const updated = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
       if (updated) await this.logProgressSummary(updated, step.rewards.map((reward) => reward.key), false, await this.rewardSteps(config));
     }
-    return paid > 0 ? `Etappe ${step.key} wurde verarbeitet.` : "Keine offene Belohnung fuer diese Etappe verarbeitet.";
+    return paid > 0 ? `Etappe ${step.key} wurde verarbeitet.` : "Keine offene Belohnung für diese Etappe verarbeitet.";
   }
 
   public async block(guildId: string, inviteeId: string, reason: string, actorId: string): Promise<boolean> {
@@ -95,7 +95,7 @@ export class ReferralRewardService {
 
   public async info(guildId: string, inviteeId: string): Promise<string> {
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
-    if (!referral) return "Keine Spielerwerbungs-Daten fuer dieses Mitglied gefunden.";
+    if (!referral) return "Keine Spielerwerbungs-Daten für dieses Mitglied gefunden.";
     const current = referral.invitedEosId ? await this.stats.getMinutesPlayed(referral.invitedEosId) : null;
     const progress = await this.repository.listStepProgress(referral.id);
     return [
@@ -179,7 +179,7 @@ export class ReferralRewardService {
       return false;
     }
     if (await this.repository.hasExistingRewardReferralForEos(referral.guildId, invitedEosId, referral.id)) {
-      await this.repository.blockRewardReferral(referral.id, "Diese EOS ID wurde bereits fuer eine Spielerwerbung verwendet.", null);
+      await this.repository.blockRewardReferral(referral.id, "Diese EOS ID wurde bereits für eine Spielerwerbung verwendet.", null);
       return false;
     }
     if (await this.repository.hasRememberedEosId(referral.guildId, invitedEosId, referral.inviteeDiscordId)) {
@@ -220,7 +220,7 @@ export class ReferralRewardService {
       : { targetType: reward.targetType, discordId: referral.inviteeDiscordId, eosId: referral.invitedEosId };
     const server = await this.resolveRewardServer(target.eosId, reward, config);
     if (!server) {
-      await this.repository.markStepRetry(referral.id, reward.key, progress.attemptCount, new Date(Date.now() + config.retryDelaySeconds * 1000), "Spieler ist aktuell nicht online bestaetigt.");
+      await this.repository.markStepRetry(referral.id, reward.key, progress.attemptCount, new Date(Date.now() + config.retryDelaySeconds * 1000), "Spieler ist aktuell nicht online bestätigt.");
       return false;
     }
     const servers = reward.deliveryMode === "global" && config.multiServerRewards ? config.clusterServers : [server];
@@ -251,7 +251,7 @@ export class ReferralRewardService {
           "referral_reward_dry_run",
           referral.inviteeDiscordId,
           referral.id,
-          `${mode}Spielerwerbung wuerde verarbeitet\nEingeladen von: <@${referral.inviterDiscordId}>\nEingeladener Spieler: <@${referral.inviteeDiscordId}>\nBelohnung: ${reward.key}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgeloest." : ""}`
+          `${mode}Spielerwerbung würde verarbeitet\nEingeladen von: <@${referral.inviterDiscordId}>\nEingeladener Spieler: <@${referral.inviteeDiscordId}>\nBelohnung: ${reward.key}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgelöst." : ""}`
         );
       }
       if (config.dryRun) return false;
@@ -274,7 +274,7 @@ export class ReferralRewardService {
       const nextAttempt = progress.attemptCount + 1;
       if (nextAttempt >= config.maxRetryAttempts) {
         await this.repository.markStepFailed(referral.id, reward.key, nextAttempt, message);
-        await this.repository.logError("referral_reward_failed", this.rewardFailureDetails(referral, reward.key, message, "endgueltig fehlgeschlagen"));
+        await this.repository.logError("referral_reward_failed", this.rewardFailureDetails(referral, reward.key, message, "endgültig fehlgeschlagen"));
       } else {
         await this.repository.markStepRetry(referral.id, reward.key, nextAttempt, new Date(Date.now() + config.retryDelaySeconds * 1000), message);
         await this.repository.logError("referral_reward_retry", this.rewardFailureDetails(referral, reward.key, message, `wird erneut versucht (${nextAttempt}/${config.maxRetryAttempts})`));
@@ -288,7 +288,7 @@ export class ReferralRewardService {
     const location = await this.stats.findOnlineLocation(eosId, config.onlinePlayers);
     if (!location) return null;
     const server = config.clusterServers.find((entry) => entry.serverId === location.serverId || entry.name === location.mapName);
-    if (!server) throw new Error(`Kein RCON-Server fuer Online-Server ${location.serverId} (${location.mapName}) konfiguriert.`);
+    if (!server) throw new Error(`Kein RCON-Server für Online-Server ${location.serverId} (${location.mapName}) konfiguriert.`);
     if (config.dryRun) return server;
     const response = await this.rcon.query(server, renderOnlineCheckCommand(config.onlineCheckCommand, eosId));
     const expected = config.onlineCheckResponseIncludes.replaceAll("{eos_id}", eosId);
@@ -326,7 +326,7 @@ export class ReferralRewardService {
       "Aktuelle Spielzeit:",
       currentProgress,
       "",
-      "Naechste Belohnung:",
+      "Nächste Belohnung:",
       nextStep ? formatShortMinutes(nextStep.requiredMinutes) : "keine",
       "",
       "Verarbeitete Belohnungen:",
@@ -346,7 +346,7 @@ export class ReferralRewardService {
       "Start-Spielzeit:",
       formatOptionalMinutes(referral.startMinutes),
       "",
-      "Naechste Belohnung:",
+      "Nächste Belohnung:",
       nextStep ? `${nextStep.key} (${formatShortMinutes(nextStep.requiredMinutes)})` : "keine",
       "",
       "Status:",
