@@ -147,7 +147,7 @@ export class ReferralRewardService {
     if (allPaid) {
       await this.repository.completeRewardReferral(currentReferral.id);
     }
-    if (activated || paid > 0 || allPaid) await this.logProgressSummary(currentReferral, paidRewardKeys, allPaid, rewardSteps);
+    if (paid > 0 || allPaid) await this.logProgressSummary(currentReferral, paidRewardKeys, allPaid, rewardSteps);
     return paid;
   }
 
