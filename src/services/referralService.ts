@@ -4,6 +4,7 @@ import type { Repository } from "../database/repositories/repository.js";
 import type { Referral } from "../utils/domain.js";
 
 export type RankingScope = "monthly" | "all_time";
+export type MemberEvaluationResult = "unchanged" | "qualified" | "unqualified";
 
 export class ReferralService {
   public constructor(private readonly repository: Repository) {}
@@ -16,17 +17,19 @@ export class ReferralService {
     return !member.user.bot && !member.pending && this.isLinked(member);
   }
 
-  public async evaluateMember(member: GuildMember): Promise<void> {
+  public async evaluateMember(member: GuildMember): Promise<MemberEvaluationResult> {
     const referral = await this.repository.findCurrentReferral(member.guild.id, member.id);
-    if (!referral || referral.status === "pending" && !this.isQualified(member)) return;
+    if (!referral || referral.status === "pending" && !this.isQualified(member)) return "unchanged";
 
     if (this.isQualified(member) && referral.status !== "qualified") {
       await this.repository.transitionReferral(referral, "qualified", "referral_qualified", null, "Mitglied ist verknuepft und das Screening ist abgeschlossen.");
-      return;
+      return "qualified";
     }
     if (!this.isLinked(member) && referral.status === "qualified") {
       await this.repository.transitionReferral(referral, "unqualified", "referral_unqualified", null, "Mitglied hat die Linked-Rolle verloren.");
+      return "unqualified";
     }
+    return "unchanged";
   }
 
   public async memberLeft(member: GuildMember): Promise<void> {

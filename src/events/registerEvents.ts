@@ -24,16 +24,31 @@ export function registerEvents(client: Client, deps: CommandDependencies): void 
   client.on(Events.GuildMemberAdd, async (member) => {
     if (member.guild.id !== env.DISCORD_GUILD_ID) return;
     await deps.invites.enqueueMemberJoin(member);
-    await deps.referrals.evaluateMember(member).catch((error: unknown) => deps.repository.logError("join_qualification_error", String(error)));
+    await evaluateMemberAndRewards(member, deps, "join_qualification_error", "join_reward_check_error");
   });
 
   client.on(Events.GuildMemberUpdate, async (_oldMember, newMember) => {
     if (newMember.guild.id !== env.DISCORD_GUILD_ID) return;
-    await deps.referrals.evaluateMember(newMember).catch((error: unknown) => deps.repository.logError("member_update_error", String(error)));
+    await evaluateMemberAndRewards(newMember, deps, "member_update_error", "member_update_reward_check_error");
   });
 
   client.on(Events.GuildMemberRemove, async (member) => {
     if (member.guild.id !== env.DISCORD_GUILD_ID) return;
     await deps.referrals.memberLeft(member as GuildMember).catch((error: unknown) => deps.repository.logError("member_remove_error", String(error)));
   });
+}
+
+async function evaluateMemberAndRewards(
+  member: GuildMember,
+  deps: CommandDependencies,
+  evaluationErrorType: string,
+  rewardErrorType: string
+): Promise<void> {
+  const result = await deps.referrals.evaluateMember(member).catch(async (error: unknown) => {
+    await deps.repository.logError(evaluationErrorType, String(error));
+    return "unchanged" as const;
+  });
+  if (result === "qualified") {
+    await deps.rewards.checkOne(member.guild.id, member.id).catch((error: unknown) => deps.repository.logError(rewardErrorType, String(error)));
+  }
 }

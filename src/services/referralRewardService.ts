@@ -46,6 +46,16 @@ export class ReferralRewardService {
     }
   }
 
+  public async checkOne(guildId: string, inviteeId: string): Promise<{ checked: number; paid: number }> {
+    const config = await this.currentConfig();
+    if (!config.enabled) return { checked: 0, paid: 0 };
+    const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
+    if (!referral || referral.status !== "qualified" || !referral.inviterDiscordId || !["pending", "active"].includes(referral.rewardStatus)) {
+      return { checked: 0, paid: 0 };
+    }
+    return { checked: 1, paid: await this.checkReferral(referral, config, await this.rewardSteps(config)) };
+  }
+
   public async forceReward(guildId: string, inviteeId: string, stepKey: string): Promise<string> {
     const config = await this.currentConfig();
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
