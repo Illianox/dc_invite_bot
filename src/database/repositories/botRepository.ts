@@ -1,5 +1,5 @@
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { InviteStatus, Referral, ReferralRewardLog, ReferralRewardStep, ReferralStatus, ReferralStepProgress, ReferralStepStatus, RewardReferralStatus, UserInvite } from "../../utils/domain.js";
+import type { InviteStatus, Referral, ReferralRewardClaim, ReferralRewardLog, ReferralRewardStep, ReferralStatus, ReferralStepProgress, ReferralStepStatus, RewardReferralStatus, RewardTargetType, UserInvite } from "../../utils/domain.js";
 import type { PanelMessageType, PendingLog, Repository } from "./repository.js";
 
 interface UserInviteRow extends RowDataPacket {
@@ -51,6 +51,21 @@ interface RewardStepRow extends RowDataPacket {
   inviter_commands: string | string[];
   invited_commands: string | string[];
   enabled: 0 | 1 | boolean;
+}
+
+interface ReferralRewardClaimRow extends RowDataPacket {
+  id: number;
+  claim_code: string;
+  referral_id: number;
+  step_key: string;
+  target_type: RewardTargetType;
+  discord_id: string;
+  eos_id: string;
+  available_at: Date;
+  expires_at: Date | null;
+  last_error: string | null;
+  created_at: Date;
+  updated_at: Date;
 }
 
 interface RuntimeLog extends PendingLog {
@@ -107,6 +122,27 @@ function mapStepProgress(row: ReferralStepProgressRow): ReferralStepProgress {
     paidAt: row.paid_at,
     createdAt: row.created_at
   };
+}
+
+function mapRewardClaim(row: ReferralRewardClaimRow): ReferralRewardClaim {
+  return {
+    id: row.id,
+    claimCode: row.claim_code,
+    referralId: row.referral_id,
+    stepKey: row.step_key,
+    targetType: row.target_type,
+    discordId: row.discord_id,
+    eosId: row.eos_id,
+    availableAt: row.available_at,
+    expiresAt: row.expires_at,
+    lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function rewardClaimCode(referralId: number, stepKey: string, targetType: RewardTargetType): string {
+  return `CLAIM-${referralId}-${targetType}-${stepKey}`.slice(0, 120);
 }
 
 export class BotRepository implements Repository {
@@ -590,6 +626,72 @@ export class BotRepository implements Repository {
     await this.pool.query(
       "UPDATE referral_step_progress SET status = 'pending', next_retry_at = NULL, last_error = NULL WHERE referral_id = ? AND step_key = ? AND status <> 'paid'",
       [referralId, stepKey]
+    );
+  }
+
+  public async upsertRewardClaimAvailable(claim: {
+    referralId: number;
+    stepKey: string;
+    targetType: RewardTargetType;
+    discordId: string;
+    eosId: string;
+    expiresAt: Date | null;
+    lastError: string | null;
+  }): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO referral_reward_claims
+        (claim_code, referral_id, step_key, target_type, discord_id, eos_id, expires_at, last_error)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         discord_id = VALUES(discord_id),
+         eos_id = VALUES(eos_id),
+         expires_at = VALUES(expires_at),
+         last_error = VALUES(last_error)`,
+      [
+        rewardClaimCode(claim.referralId, claim.stepKey, claim.targetType),
+        claim.referralId,
+        claim.stepKey,
+        claim.targetType,
+        claim.discordId,
+        claim.eosId,
+        claim.expiresAt,
+        claim.lastError?.slice(0, 4000) ?? null
+      ]
+    );
+  }
+
+  public async listOpenRewardClaims(guildId: string, discordId: string): Promise<ReferralRewardClaim[]> {
+    const [rows] = await this.pool.query<ReferralRewardClaimRow[]>(
+      `SELECT c.*
+       FROM referral_reward_claims c
+       INNER JOIN referrals r ON r.id = c.referral_id
+       WHERE r.guild_id = ?
+         AND c.discord_id = ?
+         AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
+       ORDER BY c.available_at ASC, c.id ASC`,
+      [guildId, discordId]
+    );
+    return rows.map(mapRewardClaim);
+  }
+
+  public async listAllOpenRewardClaims(guildId: string, limit: number): Promise<ReferralRewardClaim[]> {
+    const [rows] = await this.pool.query<ReferralRewardClaimRow[]>(
+      `SELECT c.*
+       FROM referral_reward_claims c
+       INNER JOIN referrals r ON r.id = c.referral_id
+       WHERE r.guild_id = ?
+         AND (c.expires_at IS NULL OR c.expires_at > CURRENT_TIMESTAMP)
+       ORDER BY c.available_at ASC, c.id ASC
+       LIMIT ?`,
+      [guildId, limit]
+    );
+    return rows.map(mapRewardClaim);
+  }
+
+  public async deleteRewardClaim(referralId: number, stepKey: string, targetType: RewardTargetType): Promise<void> {
+    await this.pool.query(
+      "DELETE FROM referral_reward_claims WHERE referral_id = ? AND step_key = ? AND target_type = ?",
+      [referralId, stepKey, targetType]
     );
   }
 

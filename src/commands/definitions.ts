@@ -44,6 +44,7 @@ export const commandDefinitions = [
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))
     )
     .addSubcommand((command) => command.setName("forcecheck").setDescription("Prueft alle aktiven Spielerwerbungen sofort."))
+    .addSubcommand((command) => command.setName("claims").setDescription("Zeigt offene Belohnungs-Abholungen."))
     .addSubcommand((command) =>
       command.setName("forcereward").setDescription("Verarbeitet eine Etappe manuell.")
         .addUserOption((option) => option.setName("member").setDescription("Geworbenes Mitglied").setRequired(true))

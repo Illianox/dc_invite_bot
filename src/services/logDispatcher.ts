@@ -45,6 +45,7 @@ function shouldSendToDiscord(eventType: string, severity: "info" | "warn" | "err
     "referral_reward_active",
     "referral_reward_blocked",
     "referral_reward_failed",
+    "referral_reward_paid",
     "referral_reward_progress_updated",
     "referral_reward_retry",
     "referral_reward_unblocked"
@@ -76,7 +77,7 @@ function logTitle(eventType: string): string {
     referral_reward_completed: "Spielerwerbung abgeschlossen",
     referral_reward_dry_run: "Spielerwerbung Dry-Run",
     referral_reward_failed: "Spielerwerbung fehlgeschlagen",
-    referral_reward_paid: "Spielerwerbung verarbeitet",
+    referral_reward_paid: "Spielerwerbungs-Belohnung ausgezahlt",
     referral_reward_progress_updated: "Spielerwerbungs-Fortschritt aktualisiert",
     referral_reward_retry: "Spielerwerbung Retry",
     referral_reward_start_minutes_saved: "Start-Spielzeit gespeichert",

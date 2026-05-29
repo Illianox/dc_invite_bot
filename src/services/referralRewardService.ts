@@ -79,6 +79,49 @@ export class ReferralRewardService {
     return paid > 0 ? `Etappe ${step.key} wurde verarbeitet.` : "Keine offene Belohnung für diese Etappe verarbeitet.";
   }
 
+  public async claimInviterRewards(guildId: string, inviterId: string): Promise<string> {
+    const config = await this.currentConfig();
+    if (!config.enabled) return "Das Belohnungssystem ist aktuell deaktiviert.";
+    const rewardSteps = await this.rewardSteps(config);
+    const referrals = await this.repository.listQualifiedByInviter(guildId, inviterId);
+    let attempted = 0;
+    let paid = 0;
+
+    for (const referral of referrals) {
+      if (!["pending", "active"].includes(referral.rewardStatus)) continue;
+      await this.ensureActive(referral);
+      const currentReferral = await this.repository.findRewardReferralByInvitee(guildId, referral.inviteeDiscordId);
+      if (!currentReferral || currentReferral.rewardStatus !== "active" || !currentReferral.invitedEosId || currentReferral.startMinutes === null) continue;
+      const currentMinutes = await this.stats.getMinutesPlayed(currentReferral.invitedEosId);
+      if (currentMinutes === null) continue;
+      const earnedMinutes = currentMinutes - currentReferral.startMinutes;
+      const paidRewardKeys: string[] = [];
+
+      for (const step of rewardSteps) {
+        if (earnedMinutes < step.requiredMinutes) continue;
+        for (const reward of step.rewards) {
+          if (reward.targetType !== "inviter" || reward.deliveryMode !== "online_server") continue;
+          const progress = await this.repository.ensureStepProgress(currentReferral.id, reward.key, step.requiredMinutes);
+          if (!this.isClaimable(progress)) continue;
+          attempted++;
+          if (await this.payReward(currentReferral, step, reward, progress, config, true)) {
+            paid++;
+            paidRewardKeys.push(reward.key);
+          }
+        }
+      }
+
+      if (paidRewardKeys.length > 0) {
+        const allPaid = await this.completeIfAllRewardsPaid(currentReferral, rewardSteps);
+        await this.logProgressSummary(currentReferral, paidRewardKeys, allPaid, rewardSteps);
+      }
+    }
+
+    if (paid > 0) return `${paid} Belohnung(en) wurden ausgezahlt.`;
+    if (attempted > 0) return "Keine Belohnung wurde ausgezahlt. Stelle sicher, dass du gerade online bist und der richtige Server in der Reward-Config hinterlegt ist.";
+    return "Du hast aktuell keine offene Online-Belohnung zum Abholen.";
+  }
+
   public async block(guildId: string, inviteeId: string, reason: string, actorId: string): Promise<boolean> {
     const referral = await this.repository.findRewardReferralByInvitee(guildId, inviteeId);
     if (!referral) return false;
@@ -122,6 +165,7 @@ export class ReferralRewardService {
             enabled: step.enabled,
             rewards: step.rewards.map((reward) => ({
               key: reward.key,
+              label: reward.label,
               targetType: reward.target,
               deliveryMode: reward.mode,
               commands: reward.commands
@@ -206,6 +250,20 @@ export class ReferralRewardService {
     return true;
   }
 
+  private isClaimable(progress: ReferralStepProgress): boolean {
+    return !["paid", "blocked", "failed"].includes(progress.status);
+  }
+
+  private async completeIfAllRewardsPaid(referral: Referral, rewardSteps: ReferralRewardStep[]): Promise<boolean> {
+    const allProgress = await this.repository.listStepProgress(referral.id);
+    const allRewardKeys = rewardSteps.flatMap((step) => step.rewards.map((reward) => reward.key));
+    const allPaid = allRewardKeys.length > 0 && allRewardKeys.every((rewardKey) => allProgress.some((progress) => progress.stepKey === rewardKey && progress.status === "paid"));
+    if (allPaid) {
+      await this.repository.completeRewardReferral(referral.id);
+    }
+    return allPaid;
+  }
+
   private async payReward(
     referral: Referral,
     step: ReferralRewardStep,
@@ -220,6 +278,17 @@ export class ReferralRewardService {
       : { targetType: reward.targetType, discordId: referral.inviteeDiscordId, eosId: referral.invitedEosId };
     const server = await this.resolveRewardServer(target.eosId, reward, config);
     if (!server) {
+      if (reward.deliveryMode === "online_server") {
+        await this.repository.upsertRewardClaimAvailable({
+          referralId: referral.id,
+          stepKey: reward.key,
+          targetType: target.targetType,
+          discordId: target.discordId,
+          eosId: target.eosId,
+          expiresAt: null,
+          lastError: "Spieler ist aktuell nicht online bestätigt."
+        });
+      }
       await this.repository.markStepRetry(referral.id, reward.key, progress.attemptCount, new Date(Date.now() + config.retryDelaySeconds * 1000), "Spieler ist aktuell nicht online bestätigt.");
       return false;
     }
@@ -251,11 +320,36 @@ export class ReferralRewardService {
           "referral_reward_dry_run",
           referral.inviteeDiscordId,
           referral.id,
-          `${mode}Spielerwerbung würde verarbeitet\nEingeladen von: <@${referral.inviterDiscordId}>\nEingeladener Spieler: <@${referral.inviteeDiscordId}>\nBelohnung: ${reward.key}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgelöst." : ""}`
+          `${mode}Spielerwerbung würde verarbeitet\nEingeladen von: <@${referral.inviterDiscordId}>\nEingeladener Spieler: <@${referral.inviteeDiscordId}>\nBelohnung: ${rewardLabel(reward)}\nCommands:\n${expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n")}${forced ? "\nManuell ausgelöst." : ""}`
         );
       }
       if (config.dryRun) return false;
       await this.repository.markStepPaid(referral.id, reward.key);
+      await this.repository.deleteRewardClaim(referral.id, reward.key, target.targetType);
+      await this.repository.logInfo(
+        "referral_reward_paid",
+        target.discordId,
+        referral.id,
+        [
+          "Werber:",
+          referral.inviterDiscordId ? displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
+          "",
+          "Geworbener Spieler:",
+          displayUser(referral.inviteeDiscordId, referral.inviteeDiscordName),
+          "",
+          "Empfänger:",
+          displayUser(target.discordId, target.targetType === "inviter" ? referral.inviterDiscordName : referral.inviteeDiscordName),
+          "",
+          "Belohnung:",
+          rewardLabel(reward),
+          "",
+          "Commands:",
+          expandedCommands.map((entry) => `[${entry.server.name}] ${entry.command}`).join("\n"),
+          "",
+          "Auslöser:",
+          forced ? "manuell" : "automatisch"
+        ].join("\n")
+      );
       return true;
     } catch (error) {
       const message = String(error);
@@ -274,10 +368,10 @@ export class ReferralRewardService {
       const nextAttempt = progress.attemptCount + 1;
       if (nextAttempt >= config.maxRetryAttempts) {
         await this.repository.markStepFailed(referral.id, reward.key, nextAttempt, message);
-        await this.repository.logError("referral_reward_failed", this.rewardFailureDetails(referral, reward.key, message, "endgültig fehlgeschlagen"));
+        await this.repository.logError("referral_reward_failed", this.rewardFailureDetails(referral, rewardLabel(reward), message, "endgültig fehlgeschlagen"));
       } else {
         await this.repository.markStepRetry(referral.id, reward.key, nextAttempt, new Date(Date.now() + config.retryDelaySeconds * 1000), message);
-        await this.repository.logError("referral_reward_retry", this.rewardFailureDetails(referral, reward.key, message, `wird erneut versucht (${nextAttempt}/${config.maxRetryAttempts})`));
+        await this.repository.logError("referral_reward_retry", this.rewardFailureDetails(referral, rewardLabel(reward), message, `wird erneut versucht (${nextAttempt}/${config.maxRetryAttempts})`));
       }
       return false;
     }
@@ -310,9 +404,10 @@ export class ReferralRewardService {
       : nextStep
         ? `${formatShortMinutes(earnedMinutes)} / ${formatShortMinutes(nextStep.requiredMinutes)}`
         : formatShortMinutes(earnedMinutes);
+    const rewardLabelByKey = new Map(rewardSteps.flatMap((step) => step.rewards.map((reward) => [reward.key, rewardLabel(reward)])));
     const paidRewards = paidRewardKeys.length
-      ? paidRewardKeys.join(", ")
-      : progress.filter((step) => step.status === "paid").map((step) => step.stepKey).join(", ") || "keine";
+      ? paidRewardKeys.map((key) => rewardLabelByKey.get(key) ?? key).join(", ")
+      : progress.filter((step) => step.status === "paid").map((step) => rewardLabelByKey.get(step.stepKey) ?? step.stepKey).join(", ") || "keine";
     await this.repository.logInfo("referral_reward_progress_updated", referral.inviteeDiscordId, referral.id, [
       "Werber:",
       referral.inviterDiscordId ? displayUser(referral.inviterDiscordId, referral.inviterDiscordName) : "unbekannt",
@@ -380,6 +475,10 @@ function renderCommand(template: string, eosId: string, discordId: string, refer
     .replaceAll("{discord_id}", discordId)
     .replaceAll("{referral_id}", String(referralId))
     .replaceAll("{step_key}", stepKey);
+}
+
+function rewardLabel(reward: ReferralRewardDefinition): string {
+  return reward.label ?? reward.key;
 }
 
 function renderOnlineCheckCommand(template: string, eosId: string): string {

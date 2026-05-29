@@ -53,7 +53,8 @@ function mainPanelButtons(): ActionRowBuilder<ButtonBuilder>[] {
   return [
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId("invite:mine").setLabel("Mein Einladungslink").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine geworbenen Spieler").setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId("referrals:mine:0").setLabel("Meine geworbenen Spieler").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("rewards:claim").setLabel("Belohnung abholen").setStyle(ButtonStyle.Secondary)
     )
   ];
 }

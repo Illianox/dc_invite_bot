@@ -1,5 +1,6 @@
 import type {
   Referral,
+  ReferralRewardClaim,
   ReferralRewardLog,
   ReferralRewardStep,
   ReferralStatus,
@@ -71,6 +72,18 @@ export interface Repository {
   markStepRetry(referralId: number, stepKey: string, attemptCount: number, nextRetryAt: Date, error: string): Promise<void>;
   markStepFailed(referralId: number, stepKey: string, attemptCount: number, error: string): Promise<void>;
   resetStepForRetry(referralId: number, stepKey: string): Promise<void>;
+  upsertRewardClaimAvailable(claim: {
+    referralId: number;
+    stepKey: string;
+    targetType: "inviter" | "invited";
+    discordId: string;
+    eosId: string;
+    expiresAt: Date | null;
+    lastError: string | null;
+  }): Promise<void>;
+  listOpenRewardClaims(guildId: string, discordId: string): Promise<ReferralRewardClaim[]>;
+  listAllOpenRewardClaims(guildId: string, limit: number): Promise<ReferralRewardClaim[]>;
+  deleteRewardClaim(referralId: number, stepKey: string, targetType: "inviter" | "invited"): Promise<void>;
   logRewardPayout(log: ReferralRewardLog): Promise<void>;
   logInfo(eventType: string, discordUserId: string | null, referralId: number | null, details: string): Promise<void>;
   deleteExpiredHistory(retentionDays: number): Promise<void>;

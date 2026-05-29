@@ -1,4 +1,4 @@
-import type { Referral, ReferralRewardLog, ReferralRewardStep, ReferralStatus, ReferralStepProgress, UserInvite } from "../../utils/domain.js";
+import type { Referral, ReferralRewardClaim, ReferralRewardLog, ReferralRewardStep, ReferralStatus, ReferralStepProgress, RewardTargetType, UserInvite } from "../../utils/domain.js";
 import type { PanelMessageType, PendingLog, Repository } from "./repository.js";
 
 interface QueueItem {
@@ -29,15 +29,21 @@ interface StoredEvent {
   createdAt: Date;
 }
 
+function rewardClaimCode(referralId: number, stepKey: string, targetType: RewardTargetType): string {
+  return `CLAIM-${referralId}-${targetType}-${stepKey}`.slice(0, 120);
+}
+
 export class MemoryRepository implements Repository {
   private inviteId = 1;
   private referralId = 1;
   private queueId = 1;
   private logId = 1;
   private stepId = 1;
+  private claimId = 1;
   private readonly invites: UserInvite[] = [];
   private readonly referrals: Referral[] = [];
   private readonly steps: ReferralStepProgress[] = [];
+  private readonly claims: ReferralRewardClaim[] = [];
   private rewardSteps: ReferralRewardStep[] = [];
   private readonly rewardLogs: ReferralRewardLog[] = [];
   private readonly identities = new Map<string, string>();
@@ -410,6 +416,70 @@ export class MemoryRepository implements Repository {
       step.nextRetryAt = null;
       step.lastError = null;
     }
+  }
+
+  public async upsertRewardClaimAvailable(claim: {
+    referralId: number;
+    stepKey: string;
+    targetType: RewardTargetType;
+    discordId: string;
+    eosId: string;
+    expiresAt: Date | null;
+    lastError: string | null;
+  }): Promise<void> {
+    const existing = this.claims.find((entry) => entry.referralId === claim.referralId && entry.stepKey === claim.stepKey && entry.targetType === claim.targetType);
+    if (existing) {
+      existing.discordId = claim.discordId;
+      existing.eosId = claim.eosId;
+      existing.expiresAt = claim.expiresAt;
+      existing.lastError = claim.lastError;
+      existing.updatedAt = new Date();
+      return;
+    }
+    const now = new Date();
+    this.claims.push({
+      id: this.claimId++,
+      claimCode: rewardClaimCode(claim.referralId, claim.stepKey, claim.targetType),
+      referralId: claim.referralId,
+      stepKey: claim.stepKey,
+      targetType: claim.targetType,
+      discordId: claim.discordId,
+      eosId: claim.eosId,
+      availableAt: now,
+      expiresAt: claim.expiresAt,
+      lastError: claim.lastError,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+
+  public async listOpenRewardClaims(guildId: string, discordId: string): Promise<ReferralRewardClaim[]> {
+    const now = Date.now();
+    return this.claims
+      .filter((claim) => {
+        const referral = this.referrals.find((entry) => entry.id === claim.referralId);
+        return referral?.guildId === guildId &&
+          claim.discordId === discordId &&
+          (!claim.expiresAt || claim.expiresAt.getTime() > now);
+      })
+      .sort((left, right) => left.availableAt.getTime() - right.availableAt.getTime() || left.id - right.id);
+  }
+
+  public async listAllOpenRewardClaims(guildId: string, limit: number): Promise<ReferralRewardClaim[]> {
+    const now = Date.now();
+    return this.claims
+      .filter((claim) => {
+        const referral = this.referrals.find((entry) => entry.id === claim.referralId);
+        return referral?.guildId === guildId &&
+          (!claim.expiresAt || claim.expiresAt.getTime() > now);
+      })
+      .sort((left, right) => left.availableAt.getTime() - right.availableAt.getTime() || left.id - right.id)
+      .slice(0, limit);
+  }
+
+  public async deleteRewardClaim(referralId: number, stepKey: string, targetType: RewardTargetType): Promise<void> {
+    const index = this.claims.findIndex((entry) => entry.referralId === referralId && entry.stepKey === stepKey && entry.targetType === targetType);
+    if (index >= 0) this.claims.splice(index, 1);
   }
 
   public async logRewardPayout(log: ReferralRewardLog): Promise<void> {

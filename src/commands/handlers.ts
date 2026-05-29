@@ -104,6 +104,18 @@ export async function handleCommand(interaction: ChatInputCommandInteraction, de
       await interaction.editReply(`Spielerwerbungs-Pruefung abgeschlossen. Geprueft: ${result.checked}, verarbeitete Etappen: ${result.paid}.`);
       return;
     }
+    if (subcommand === "claims") {
+      const claims = await deps.repository.listAllOpenRewardClaims(interaction.guildId, 20);
+      const lines = claims.map((claim) => [
+        claim.claimCode,
+        `<@${claim.discordId}>`,
+        claim.stepKey,
+        claim.targetType,
+        claim.expiresAt ? `<t:${Math.floor(claim.expiresAt.getTime() / 1000)}:R>` : "kein Ablauf"
+      ].join(" - "));
+      await interaction.reply({ content: lines.length ? lines.join("\n") : "Keine offenen Belohnungs-Abholungen gefunden.", flags: MessageFlags.Ephemeral });
+      return;
+    }
     if (subcommand === "reload") {
       const config = await deps.rewards.reloadConfig();
       const steps = await deps.repository.listRewardSteps();
@@ -240,6 +252,16 @@ export async function handleButton(interaction: ButtonInteraction, deps: Command
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const url = await deps.invites.getOrCreatePersonalInvite(interaction.guild!, member);
     await interaction.editReply(`Dein persoenlicher Einladungslink:\n${url}`);
+    return;
+  }
+
+  if (interaction.customId === "rewards:claim") {
+    if (!deps.referrals.isLinked(member)) {
+      await interaction.reply({ content: "Du benoetigst zuerst die Rolle `Linked` aus dem bestehenden Verknuepfungs-System.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    await interaction.editReply(await deps.rewards.claimInviterRewards(interaction.guildId, member.id));
     return;
   }
 

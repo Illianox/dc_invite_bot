@@ -12,6 +12,7 @@ const rconServerSchema = z.object({
 
 const rewardDefinitionSchema = z.object({
   key: z.string().min(1),
+  label: z.string().min(1).optional(),
   target: z.enum(["inviter", "invited"]),
   mode: z.enum(["global", "online_server"]).default("global"),
   commands: z.array(z.string().min(1)).min(1)

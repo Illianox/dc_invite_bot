@@ -37,18 +37,21 @@
       "rewards": [
         {
           "key": "10h_points_inviter",
+          "label": "10 Stunden Punkte für Werber",
           "target": "inviter",
           "mode": "global",
           "commands": ["addpoints {eos_id} 10000"]
         },
         {
           "key": "10h_points_invited",
+          "label": "10 Stunden Punkte für geworbenen Spieler",
           "target": "invited",
           "mode": "global",
           "commands": ["addpoints {eos_id} 5000"]
         },
         {
           "key": "10h_item_invited",
+          "label": "10 Stunden Starterkit für geworbenen Spieler",
           "target": "invited",
           "mode": "online_server",
           "commands": ["giveitem {eos_id} starterkit"]

@@ -72,6 +72,21 @@ export interface ReferralRewardLog {
   errorMessage: string | null;
 }
 
+export interface ReferralRewardClaim {
+  id: number;
+  claimCode: string;
+  referralId: number;
+  stepKey: string;
+  targetType: RewardTargetType;
+  discordId: string;
+  eosId: string;
+  availableAt: Date;
+  expiresAt: Date | null;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ReferralRewardStep {
   key: string;
   requiredMinutes: number;
@@ -81,6 +96,7 @@ export interface ReferralRewardStep {
 
 export interface ReferralRewardDefinition {
   key: string;
+  label?: string;
   targetType: RewardTargetType;
   deliveryMode: RewardDeliveryMode;
   commands: string[];
